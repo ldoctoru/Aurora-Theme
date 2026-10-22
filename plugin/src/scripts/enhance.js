@@ -1462,6 +1462,161 @@
     render();
   }
 
+  // Dashboard: health strip above the tiles, from include/health.php. Problems first (red, amber,
+  // blue), then good news, so the four most useful facts are always in view. Each state has its
+  // own icon shape as well as its colour. Refreshed every minute while the page is visible.
+  function dashboardHealth() {
+    if (!window.auroraHealth) return;
+    const grid = document.querySelector('#displaybox div.frame');
+    if (!grid || !document.getElementById('db_box1')) return;
+    const SVG = 'http://www.w3.org/2000/svg';
+    const SHAPES = {
+      danger: ['path', { d: 'M5.1 1h5.8L15 5.1v5.8L10.9 15H5.1L1 10.9V5.1z' }],
+      warn: ['path', { d: 'M8 1.2L15.2 14H.8z' }],
+      info: ['circle', { cx: '8', cy: '8', r: '7' }],
+      ok: ['circle', { cx: '8', cy: '8', r: '7' }],
+    };
+    const MARKS = {
+      danger: 'M5.8 5.8l4.4 4.4M10.2 5.8l-4.4 4.4',
+      warn: 'M8 6v3.6M8 11.6v.1',
+      info: 'M8 7.2v4M8 4.6v.1',
+      ok: 'M4.8 8.2l2.1 2.1 4.3-4.6',
+    };
+    function icon(tone) {
+      const svg = document.createElementNS(SVG, 'svg');
+      svg.setAttribute('viewBox', '0 0 16 16');
+      svg.setAttribute('aria-hidden', 'true');
+      svg.setAttribute('class', 'tp-health-icon');
+      const shape = document.createElementNS(SVG, SHAPES[tone][0]);
+      Object.entries(SHAPES[tone][1]).forEach(function (pair) { shape.setAttribute(pair[0], pair[1]); });
+      const mark = document.createElementNS(SVG, 'path');
+      mark.setAttribute('d', MARKS[tone]);
+      mark.setAttribute('class', 'tp-health-mark');
+      svg.append(shape, mark);
+      return svg;
+    }
+    const strip = element('ul', 'tp-health');
+    strip.id = 'tp-dashboard-health';
+    strip.setAttribute('aria-label', 'Server health');
+    let failures = 0;
+    let timer = null;
+
+    function render(items) {
+      strip.replaceChildren(...items.map(function (item) {
+        const tone = Object.prototype.hasOwnProperty.call(SHAPES, item.tone) ? item.tone : 'info';
+        const li = element('li', 'tp-health-item tp-health-' + tone);
+        const link = element('a', 'tp-health-link');
+        link.href = /^\/[A-Za-z0-9/_?=.-]*$/.test(item.href || '') ? item.href : '/Dashboard';
+        const text = element('span', 'tp-health-text');
+        text.append(element('strong', 'tp-health-title', String(item.title || '')), element('span', 'tp-health-detail', String(item.detail || '')));
+        link.append(icon(tone), text);
+        li.append(link);
+        return li;
+      }));
+      // Above the summary strip (uptime, CPU, memory, array) when that is shown.
+      if (!strip.isConnected) (document.getElementById('tp-dashboard-summary') || grid).before(strip);
+    }
+
+    function load() {
+      if (document.hidden) return;
+      fetch(PLUGIN_BASE + '/include/health.php', { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (response) {
+          if (!response.ok) throw new Error('health failed with status ' + response.status);
+          return response.json();
+        })
+        .then(function (data) {
+          failures = 0;
+          if (Array.isArray(data.items) && data.items.length) render(data.items);
+        })
+        .catch(function (error) {
+          failures++;
+          if (failures >= 3) {
+            clearInterval(timer);
+            console.error('Aurora Theme health strip:', error);
+          }
+        });
+    }
+
+    load();
+    timer = setInterval(load, 60000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
+  }
+
+  // Dashboard: tiles grouped by kind, as on TrueNAS. Column 1 System (server, processor, memory,
+  // network, power, fans, GPU), column 2 Apps and shares, column 3 Storage. Tiles the theme does
+  // not recognise stay in their column. Uses Unraid's own layout record (the page's "cookie"
+  // object and saveCookie()), so the order is saved the same way a drag saves it. Tiles are
+  // recognised by their id or settings link, not their translated title.
+  function dashboardGrouping() {
+    if (!window.auroraDashboardGroups) return;
+    const boxes = ['db_box1', 'db_box2', 'db_box3'].map(function (id) { return document.getElementById(id); });
+    if (boxes.some(function (box) { return !box; })) return;
+    const LABELS = ['System', 'Apps and shares', 'Storage'];
+
+    function kind(tile) {
+      if (tile.classList.contains('system') || /^tblGPUDash/.test(tile.id)) return 0;
+      if (/^(docker_view|vm_view|vm_view_usage)$/.test(tile.id)) return 1;
+      if (/^(array_list|pool_list\d*|devs_list)$/.test(tile.id)) return 2;
+      const header = tile.querySelector('tr');
+      const targets = header ? [...header.querySelectorAll('a[href], a[onclick]')].map(function (link) {
+        return (link.getAttribute('href') || '') + ' ' + (link.getAttribute('onclick') || '');
+      }).join(' ') : '';
+      if (/CPUset|Processes|NetworkSettings|UPSsettings|FanSettings|VPNmanager|InfoButton/.test(targets)) return 0;
+      if (/\/(Shares|Users)\b/.test(targets)) return 1;
+      if (/Scheduler|DiskSettings|Device\?name=/.test(targets)) return 2;
+      return -1;
+    }
+
+    function labels() {
+      boxes.forEach(function (box, index) {
+        if (box.previousElementSibling && box.previousElementSibling.classList.contains('tp-group-label')) return;
+        const label = element('h2', 'tp-group-label', LABELS[index]);
+        box.before(label);
+      });
+    }
+
+    function group() {
+      const tiles = boxes.map(function (box) { return [...box.querySelectorAll(':scope > tbody')]; });
+      // Unraid gives every tile its "sort" key when the page starts; wait until it has.
+      if (tiles.flat().some(function (tile) { return !tile.getAttribute('sort'); })) return false;
+      const target = [[], [], []];
+      tiles.forEach(function (list, column) {
+        list.forEach(function (tile) {
+          const k = kind(tile);
+          target[k < 0 ? column : k].push(tile);
+        });
+      });
+      let changed = false;
+      target.forEach(function (list, column) {
+        const box = boxes[column];
+        list.forEach(function (tile) {
+          if (tile.parentElement !== box) changed = true;
+          // Each tile has a spacer (thead.stopgap) just before it; they move together.
+          const gap = tile.previousElementSibling && tile.previousElementSibling.matches('thead.stopgap') ? tile.previousElementSibling : null;
+          if (gap) box.append(gap);
+          box.append(tile);
+        });
+        const order = list.map(function (tile) { return tile.getAttribute('sort'); }).join(';');
+        if (window.cookie && typeof window.cookie === 'object' && window.cookie[box.id] !== order) {
+          window.cookie[box.id] = order;
+          changed = true;
+        }
+        // A column that ends up empty is hidden, as Unraid does after a drag.
+        const tileBox = box.closest('div.tile');
+        if (tileBox) tileBox.style.display = list.some(function (tile) { return tile.style.display !== 'none'; }) ? '' : 'none';
+      });
+      if (changed && typeof window.saveCookie === 'function') window.saveCookie();
+      labels();
+      return true;
+    }
+
+    let tries = 0;
+    (function attempt() {
+      if (group() || ++tries > 20) return;
+      setTimeout(attempt, 250);
+    })();
+  }
+
   // Dashboard load charts are drawn by SmoothieCharts on a canvas, so CSS cannot colour them.
   // Their options are adjusted once: theme colours, a thicker smooth line with a soft fill.
   function dashboardCharts() {
@@ -3749,7 +3904,7 @@
 
   function start() {
     const info = pageInfo();
-    [function () { topBar(info); }, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardSummary, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
+    [function () { topBar(info); }, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardHealth, dashboardSummary, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
       // One failing enhancer must not stop the others or the page's own scripts.
       try { enhancer(); } catch (error) { console.error('Aurora Theme:', error); }
     });
