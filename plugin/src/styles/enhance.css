@@ -3970,3 +3970,91 @@ tbody.tp-cpu-tile > tr.tp-core-pair .load {
 tbody.tp-cpu-tile > tr.tp-core-pair .usage-disk {
     height: 0.35rem !important;
 }
+
+/* ---- Dashboard health strip (scripts/enhance.js, dashboardHealth) ----
+   Four cells, problems first. Each state has its own shape and colour, so it reads without
+   colour vision: octagon (failed), triangle (needs attention), circle with i (information),
+   circle with a tick (fine). */
+.tp-health {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+    gap: 1px;
+    margin: 0 0 1.4rem;
+    padding: 0;
+    overflow: hidden;
+    list-style: none;
+    border: 1px solid var(--tp-border, var(--table-border-color));
+    border-radius: var(--tp-r-md, 12px);
+    background-color: var(--tp-border, var(--table-border-color));
+}
+
+.tp-health-item {
+    display: flex;
+    margin: 0;
+    background-color: var(--tp-elevated, var(--table-background-color));
+}
+
+.tp-health-link {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 1rem;
+    min-height: 4.4rem;
+    padding: 1rem 1.6rem;
+    color: var(--tp-text, var(--text-color)) !important;
+    text-decoration: none !important;
+}
+
+.tp-health-link:hover {
+    background-color: var(--tp-subtle, transparent);
+}
+
+.tp-health-icon {
+    flex: none;
+    width: 1.8rem;
+    height: 1.8rem;
+}
+
+.tp-health-icon .tp-health-mark {
+    fill: none;
+    stroke: var(--tp-elevated, var(--table-background-color));
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.tp-health-danger .tp-health-icon { fill: var(--tp-danger, #ef4444); }
+.tp-health-warn .tp-health-icon { fill: var(--tp-warn-text, #f59e0b); }
+.tp-health-info .tp-health-icon { fill: var(--tp-primary, #4f8bff); }
+.tp-health-ok .tp-health-icon { fill: var(--tp-success-text, #22c55e); }
+
+.tp-health-danger { box-shadow: inset 3px 0 0 var(--tp-danger, #ef4444); }
+.tp-health-warn { box-shadow: inset 3px 0 0 var(--tp-warn-text, #f59e0b); }
+
+.tp-health-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.tp-health-title {
+    font-weight: 600;
+}
+
+.tp-health-detail {
+    overflow: hidden;
+    color: var(--tp-muted, var(--alt-text-color));
+    font-size: 1.2rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Dashboard column labels when tiles are grouped (dashboardGrouping) ---- */
+.tp-group-label {
+    margin: 0 0 0.8rem;
+    padding: 0 0.4rem;
+    color: var(--tp-muted, var(--alt-text-color));
+    font: 600 1.1rem var(--tp-font-heading, inherit);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}

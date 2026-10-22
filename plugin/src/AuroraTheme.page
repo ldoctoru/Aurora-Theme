@@ -165,6 +165,7 @@ if (in_array(rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PAT
 ?>
 <script>window.auroraDockerGroups = <?= json_encode($auroraGroups['docker'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
 <script>window.auroraVmGroups = <?= json_encode($auroraGroups['vm'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
+<script>window.auroraHealth = <?= ($aurora['health'] ?? 'yes') == 'yes' ? 'true' : 'false' ?>; window.auroraDashboardGroups = <?= ($aurora['dashgroups'] ?? 'no') == 'yes' ? 'true' : 'false' ?>;</script>
 <script>window.auroraDecimalMark = <?= json_encode(substr((string) ($display['number'] ?? '.,'), 0, 1) ?: '.') ?>;</script>
 <?php
     // FolderView installed: the switch above the Docker list chooses between its folders and the

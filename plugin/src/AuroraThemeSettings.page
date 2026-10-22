@@ -70,6 +70,25 @@ _(Page enhancements)_:
   <?=mk_option($aurora['enhance'], "no", _("Disabled"))?>
   </select>
 
+_(Dashboard health strip)_:
+: <select name="health">
+  <?=mk_option($aurora['health'] ?? 'yes', "yes", _("Shown"))?>
+  <?=mk_option($aurora['health'] ?? 'yes', "no", _("Hidden"))?>
+  </select>
+
+> A row above the Dashboard tiles with the four most useful facts: failed or hot disks, parity,
+> app updates and unread alerts, problems first. Needs page enhancements.
+
+_(Dashboard tile groups)_:
+: <select name="dashgroups">
+  <?=mk_option($aurora['dashgroups'] ?? 'no', "no", _("As arranged"))?>
+  <?=mk_option($aurora['dashgroups'] ?? 'no', "yes", _("Grouped: System, Apps and shares, Storage"))?>
+  </select>
+
+> Grouped puts every tile in its column by kind and labels the columns, as on TrueNAS. It saves
+> the order the same way dragging a tile does, so tiles you move are put back in their group on
+> the next visit. Tiles from other plugins that the theme does not recognise stay where they are.
+
 > Adds elements Unraid does not have, such as the summary strip above the Docker container list.
 
 _(Stats page)_:
