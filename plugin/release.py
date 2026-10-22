@@ -12,8 +12,10 @@ Run from a clean working tree, with the release's CHANGES line already in build.
 import datetime
 import os
 import pathlib
+import re
 import subprocess
 import sys
+import time
 
 root = pathlib.Path(__file__).resolve().parent.parent
 PLG = "Aurora-Theme.plg"
@@ -34,7 +36,24 @@ dirty = [line for line in git("status", "--porcelain").splitlines() if not line.
 if dirty:
     sys.exit("The working tree has changes other than plugin/build.py:\n" + "\n".join(dirty))
 
-version = datetime.datetime.now().strftime("%Y.%m.%d.%H%M")
+# The version is the current minute. A build earlier in the same minute (plugin/build.py run by
+# hand, or a previous release) already wrote that version into Aurora-Theme.plg, and rebuilding
+# would change nothing, so there would be nothing to commit and Unraid would not see a newer
+# version. Wait for the next minute instead (at most about a minute).
+def now_version():
+    return datetime.datetime.now().strftime("%Y.%m.%d.%H%M")
+
+
+match = re.search(r'<PLUGIN\b[^>]*?\bversion="([^"]+)"', (root / PLG).read_text(encoding="utf-8"), re.S)
+current = match.group(1) if match else ""
+version = now_version()
+if current and version < current:
+    sys.exit(f"{PLG} already has version {current}, later than now ({version}). Is the clock right?")
+if version == current:
+    print(f"{PLG} already has version {current}; waiting for the next minute...")
+    while version == current:
+        time.sleep(1)
+        version = now_version()
 subprocess.run([sys.executable, str(root / "plugin" / "build.py"), version], check=True)
 git("add", PLG, "plugin/build.py")
 # AURORA_COMMIT_TRAILER: an optional last line for the commit message, such as a Co-Authored-By.
