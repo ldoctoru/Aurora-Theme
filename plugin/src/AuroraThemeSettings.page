@@ -70,15 +70,15 @@ _(Page enhancements)_:
   <?=mk_option($aurora['enhance'], "no", _("Disabled"))?>
   </select>
 
-_(Dashboard health strip)_:
+_(Problem count in the top bar)_:
 : <select name="health">
   <?=mk_option($aurora['health'] ?? 'yes', "yes", _("Shown"))?>
   <?=mk_option($aurora['health'] ?? 'yes', "no", _("Hidden"))?>
   </select>
 
-> A row above the Dashboard tiles with the four most useful facts: failed or hot disks, parity,
-> app updates and unread alerts, problems first. Also shows a problem count in the top bar on
-> every page. Needs page enhancements.
+> A pill next to the page name on every page with the number of problems found: failed, disabled
+> or hot disks, read or parity errors, and unread alerts. It opens the Dashboard. Needs page
+> enhancements.
 
 _(Dashboard app tiles)_:
 : <select name="apptiles">

@@ -1462,84 +1462,18 @@
     render();
   }
 
-  // Dashboard: health strip above the tiles, from include/health.php. Problems first (red, amber,
-  // blue), then good news, so the four most useful facts are always in view. Each state has its
-  // own icon shape as well as its colour. Refreshed every minute while the page is visible.
-  function dashboardHealth() {
-    if (!window.auroraHealth) return;
-    const grid = document.querySelector('#displaybox div.frame');
-    if (!grid || !document.getElementById('db_box1')) return;
-    const SVG = 'http://www.w3.org/2000/svg';
-    const SHAPES = {
-      danger: ['path', { d: 'M5.1 1h5.8L15 5.1v5.8L10.9 15H5.1L1 10.9V5.1z' }],
-      warn: ['path', { d: 'M8 1.2L15.2 14H.8z' }],
-      info: ['circle', { cx: '8', cy: '8', r: '7' }],
-      ok: ['circle', { cx: '8', cy: '8', r: '7' }],
-    };
-    const MARKS = {
-      danger: 'M5.8 5.8l4.4 4.4M10.2 5.8l-4.4 4.4',
-      warn: 'M8 6v3.6M8 11.6v.1',
-      info: 'M8 7.2v4M8 4.6v.1',
-      ok: 'M4.8 8.2l2.1 2.1 4.3-4.6',
-    };
-    function icon(tone) {
-      const svg = document.createElementNS(SVG, 'svg');
-      svg.setAttribute('viewBox', '0 0 16 16');
-      svg.setAttribute('aria-hidden', 'true');
-      svg.setAttribute('class', 'tp-health-icon');
-      const shape = document.createElementNS(SVG, SHAPES[tone][0]);
-      Object.entries(SHAPES[tone][1]).forEach(function (pair) { shape.setAttribute(pair[0], pair[1]); });
-      const mark = document.createElementNS(SVG, 'path');
-      mark.setAttribute('d', MARKS[tone]);
-      mark.setAttribute('class', 'tp-health-mark');
-      svg.append(shape, mark);
-      return svg;
-    }
-    const strip = element('ul', 'tp-health');
-    strip.id = 'tp-dashboard-health';
-    strip.setAttribute('aria-label', 'Server health');
-    let failures = 0;
-    let timer = null;
-
-    function render(items) {
-      strip.replaceChildren(...items.map(function (item) {
-        const tone = Object.prototype.hasOwnProperty.call(SHAPES, item.tone) ? item.tone : 'info';
-        const li = element('li', 'tp-health-item tp-health-' + tone);
-        const link = element('a', 'tp-health-link');
-        link.href = /^\/[A-Za-z0-9/_?=.-]*$/.test(item.href || '') ? item.href : '/Dashboard';
-        const text = element('span', 'tp-health-text');
-        text.append(element('strong', 'tp-health-title', String(item.title || '')), element('span', 'tp-health-detail', String(item.detail || '')));
-        link.append(icon(tone), text);
-        li.append(link);
-        return li;
-      }));
-      // Above the summary strip (uptime, CPU, memory, array) when that is shown.
-      if (!strip.isConnected) (document.getElementById('tp-dashboard-summary') || grid).before(strip);
-    }
-
-    function load() {
-      if (document.hidden) return;
-      fetch(PLUGIN_BASE + '/include/health.php', { credentials: 'same-origin', cache: 'no-store' })
-        .then(function (response) {
-          if (!response.ok) throw new Error('health failed with status ' + response.status);
-          return response.json();
-        })
-        .then(function (data) {
-          failures = 0;
-          if (Array.isArray(data.items) && data.items.length) render(data.items);
-        })
-        .catch(function (error) {
-          failures++;
-          if (failures >= 3) {
-            clearInterval(timer);
-            console.error('Aurora Theme health strip:', error);
-          }
-        });
-    }
-
-    load();
-    timer = setInterval(load, 60000);
-    document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
+  // Dashboard, Shares tile: a click on a share's name opens it in the File Manager instead of
+  // its settings (those stay one click away on the Shares tab and the tile's own settings link).
+  // User shares open /mnt/user/<name>, disk shares /mnt/<disk>.
+  function dashboardShareLinks() {
+    document.querySelectorAll('table.dashboard tr.share a[href*="/Shares/Share?name="], table.dashboard tr.share a[href*="/Shares/Disk?name="]').forEach(function (link) {
+      const url = new URL(link.getAttribute('href'), location.origin);
+      const name = url.searchParams.get('name');
+      if (!name || /[\/]|^\.\.?$/.test(name)) return;
+      const dir = (/\/Disk$/.test(url.pathname) ? '/mnt/' : '/mnt/user/') + name;
+      link.href = '/Shares/Browse?dir=' + encodeURIComponent(dir).replace(/%2F/g, '/');
+      link.title = 'Open ' + name + ' in File Manager';
+    });
   }
 
   // Dashboard: tiles grouped by kind, as on TrueNAS. Column 1 System (server, processor, memory,
@@ -4102,7 +4036,7 @@
 
   function start() {
     const info = pageInfo();
-    [function () { topBar(info); }, alertPill, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, sharesPage, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardHealth, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
+    [function () { topBar(info); }, alertPill, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, sharesPage, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
       // One failing enhancer must not stop the others or the page's own scripts.
       try { enhancer(); } catch (error) { console.error('Aurora Theme:', error); }
     });
