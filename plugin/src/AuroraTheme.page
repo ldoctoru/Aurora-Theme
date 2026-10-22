@@ -152,6 +152,7 @@ try {
 <script>window.auroraPageTitle = <?= json_encode($auroraTitle, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
 <?php endif; ?>
 <link type="text/css" rel="stylesheet" href="<?php autov('/plugins/Aurora-Theme/styles/enhance.css') ?>">
+<script>window.auroraHealth = <?= ($aurora['health'] ?? 'yes') == 'yes' ? 'true' : 'false' ?>; window.auroraDashboardGroups = <?= ($aurora['dashgroups'] ?? 'no') == 'yes' ? 'true' : 'false' ?>; window.auroraAppTiles = <?= ($aurora['apptiles'] ?? 'no') == 'yes' ? 'true' : 'false' ?>;</script>
 <script defer src="<?php autov('/plugins/Aurora-Theme/scripts/enhance.js') ?>"></script>
 <?php
 // Docker and VMs tabs and Dashboard: the saved groups go straight into the page, so the
@@ -165,7 +166,6 @@ if (in_array(rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PAT
 ?>
 <script>window.auroraDockerGroups = <?= json_encode($auroraGroups['docker'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
 <script>window.auroraVmGroups = <?= json_encode($auroraGroups['vm'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
-<script>window.auroraHealth = <?= ($aurora['health'] ?? 'yes') == 'yes' ? 'true' : 'false' ?>; window.auroraDashboardGroups = <?= ($aurora['dashgroups'] ?? 'no') == 'yes' ? 'true' : 'false' ?>;</script>
 <script>window.auroraDecimalMark = <?= json_encode(substr((string) ($display['number'] ?? '.,'), 0, 1) ?: '.') ?>;</script>
 <?php
     // FolderView installed: the switch above the Docker list chooses between its folders and the
