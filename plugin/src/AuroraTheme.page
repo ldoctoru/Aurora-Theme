@@ -10,6 +10,7 @@ $auroraCustomDir = '/boot/config/plugins/Aurora-Theme';
 $auroraClasses = [];
 if (($aurora['layout'] ?? 'top') == 'sidebar') $auroraClasses[] = 'tp-sidebar';
 if (($aurora['enhance'] ?? 'yes') == 'yes') $auroraClasses[] = 'tp-enhance';
+if (($aurora['style'] ?? 'aurora') == 'console') $auroraClasses[] = 'tp-console';
 // Display Settings, "Favorites enabled" set to No also turns off the theme's starred cards.
 if (($display['favorites'] ?? 'yes') == 'no') $auroraClasses[] = 'tp-no-favourites';
 
@@ -29,6 +30,9 @@ if (isset($themeHelper) && method_exists($themeHelper, 'isTopNavTheme') && !$the
 <?php if (!$auroraOff): ?>
 <?php if (($aurora['theme'] ?? 'yes') == 'yes'): ?>
 <link type="text/css" rel="stylesheet" href="<?php autov('/plugins/Aurora-Theme/styles/theme.css') ?>">
+<?php if (in_array('tp-console', $auroraClasses)): ?>
+<link type="text/css" rel="stylesheet" href="<?php autov('/plugins/Aurora-Theme/styles/console.css') ?>">
+<?php endif; ?>
 <?php
 // Display Settings, header custom text, secondary text and background colours: the theme sets
 // Unraid's header variables itself, so the chosen colours are handed to it under its own names.

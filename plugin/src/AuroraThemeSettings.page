@@ -43,6 +43,15 @@ document.getElementById('tft-accent').addEventListener('input', function () {
 });
 </script>
 
+_(Style)_:
+: <select name="style">
+  <?=mk_option($aurora['style'] ?? 'aurora', "aurora", _("Aurora (default)"))?>
+  <?=mk_option($aurora['style'] ?? 'aurora', "console", _("Console: calm, dense, high contrast"))?>
+  </select>
+
+> Console uses flat surfaces, a single blue accent, status colours that pass contrast checks in
+> both modes, a stronger focus ring and no animation. An accent colour set above still applies.
+
 _(Navigation layout)_:
 : <select name="layout">
   <?=mk_option($aurora['layout'], "top", _("Top bar (Unraid default)"))?>
