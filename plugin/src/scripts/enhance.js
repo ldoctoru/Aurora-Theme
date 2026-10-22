@@ -1722,6 +1722,94 @@
     document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
   }
 
+  // Shares tab: a summary (shares, protected by parity, shared on the network), filter tabs
+  // (All, Unprotected, Shared) and a search by name above Unraid's list, plus an amber edge on
+  // shares whose files are not all protected. Unraid reloads the list by itself (after Compute,
+  // for example), so everything is reapplied whenever the list changes. Rows are read by their
+  // protection dot and the SMB column, not by translated text.
+  function sharesPage() {
+    const list = document.getElementById('shareslist');
+    const table = list && list.closest('table');
+    if (!table || table.previousElementSibling && table.previousElementSibling.classList.contains('tp-toolbar')) return;
+    const FILTERS = [['all', 'All'], ['unprotected', 'Unprotected'], ['shared', 'Shared']];
+    let active = 'all';
+    let shares = [];
+
+    const toolbar = element('div', 'tp-toolbar tp-shares-toolbar');
+    const tabs = element('div', 'tp-tabs');
+    tabs.setAttribute('role', 'tablist');
+    tabs.setAttribute('aria-label', 'Filter shares');
+    const counts = {};
+    FILTERS.forEach(function (filter) {
+      const tab = element('button', 'tp-tab', filter[1] + ' ');
+      tab.type = 'button';
+      tab.setAttribute('role', 'tab');
+      tab.dataset.filter = filter[0];
+      counts[filter[0]] = element('span', 'tp-tab-count', '0');
+      tab.append(counts[filter[0]]);
+      tab.addEventListener('click', function () { active = filter[0]; apply(); });
+      tabs.append(tab);
+    });
+    const search = element('input', 'tp-search');
+    search.type = 'search';
+    search.placeholder = 'Search shares';
+    search.setAttribute('aria-label', 'Search shares');
+    search.addEventListener('input', apply);
+    const tools = element('div', 'tp-tools');
+    tools.append(search);
+    toolbar.append(tabs, tools);
+    table.before(toolbar);
+
+    // One entry per share: its main row plus the per-disk rows Compute adds below it.
+    function read() {
+      shares = [];
+      [...list.rows].forEach(function (row) {
+        const link = row.querySelector('a[href*="/Share?name="]');
+        if (link) {
+          const smb = row.cells[2] ? row.cells[2].textContent.trim() : '';
+          shares.push({
+            name: link.textContent.trim(),
+            rows: [row],
+            unprotected: !!row.querySelector('.orb.yellow-orb, .orb.grey-orb'),
+            shared: smb !== '' && smb !== '-',
+          });
+        } else if (shares.length) {
+          shares[shares.length - 1].rows.push(row);
+        }
+      });
+      shares.forEach(function (share) { share.rows[0].classList.toggle('tp-share-unprotected', share.unprotected); });
+    }
+
+    function apply() {
+      const words = search.value.toLowerCase().split(/\s+/).filter(Boolean);
+      const tally = { all: shares.length, unprotected: 0, shared: 0 };
+      shares.forEach(function (share) {
+        if (share.unprotected) tally.unprotected++;
+        if (share.shared) tally.shared++;
+        const name = share.name.toLowerCase();
+        const show = (active === 'all' || share[active]) && words.every(function (word) { return name.includes(word); });
+        share.rows.forEach(function (row) { row.classList.toggle('tp-filtered-out', !show); });
+      });
+      FILTERS.forEach(function (filter) { counts[filter[0]].textContent = String(tally[filter[0]]); });
+      [...tabs.children].forEach(function (tab) { tab.setAttribute('aria-selected', String(tab.dataset.filter === active)); });
+      toolbar.hidden = shares.length === 0;
+      if (shares.length) {
+        const protectedCount = shares.length - tally.unprotected;
+        const strip = summaryStrip('tp-shares-summary', 'Shares summary', [
+          { label: 'Shares', value: String(shares.length), detail: 'user shares' },
+          { label: 'Protected', value: protectedCount + ' of ' + shares.length, detail: tally.unprotected ? tally.unprotected + ' not fully protected' : 'all files on parity', tone: tally.unprotected ? 'warn' : 'good' },
+          { label: 'Shared', value: String(tally.shared), detail: 'exported over SMB' },
+        ]);
+        if (!strip.isConnected) toolbar.before(strip);
+      }
+    }
+
+    const refresh = debounce(function () { read(); apply(); });
+    new MutationObserver(refresh).observe(list, { childList: true });
+    read();
+    apply();
+  }
+
   // Dashboard load charts are drawn by SmoothieCharts on a canvas, so CSS cannot colour them.
   // Their options are adjusted once: theme colours, a thicker smooth line with a soft fill.
   function dashboardCharts() {
@@ -4014,7 +4102,7 @@
 
   function start() {
     const info = pageInfo();
-    [function () { topBar(info); }, alertPill, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardHealth, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
+    [function () { topBar(info); }, alertPill, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, sharesPage, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardHealth, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
       // One failing enhancer must not stop the others or the page's own scripts.
       try { enhancer(); } catch (error) { console.error('Aurora Theme:', error); }
     });
