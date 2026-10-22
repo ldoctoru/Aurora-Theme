@@ -55,6 +55,16 @@ _(Style)_:
 > menu item with a graphite ground, IBM Plex fonts, small-capital group labels and coloured edges on
 > warned disk rows. An accent colour set above still applies to both.
 
+_(Fonts)_:
+: <select name="font">
+  <?=mk_option($aurora['font'] ?? 'aurora', "aurora", _("The style's own: Inter and Space Grotesk, or IBM Plex with Nexus"))?>
+  <?=mk_option($aurora['font'] ?? 'aurora', "unraid", _("Unraid default: Clear Sans"))?>
+  </select>
+
+> **The style's own** uses Inter for text and Space Grotesk for headings (IBM Plex with the Nexus
+> style), bundled with the plugin. **Unraid default** keeps Unraid's own fonts, Clear Sans for text and headings and Bitstream for code, with
+> everything else of the theme. The login page always uses the Aurora fonts.
+
 _(Navigation layout)_:
 : <select name="layout">
   <?=mk_option($aurora['layout'], "top", _("Top bar (Unraid default)"))?>
