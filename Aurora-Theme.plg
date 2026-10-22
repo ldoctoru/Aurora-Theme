@@ -3,7 +3,7 @@
 
 <PLUGIN name="Aurora-Theme"
         author="Tunefish"
-        version="2026.10.22.2344"
+        version="2026.10.22.2358"
         launch="Settings/AuroraThemeSettings"
         pluginURL="https://raw.githubusercontent.com/ldoctoru/Aurora-Theme/release/Aurora-Theme.plg"
         support="https://github.com/ldoctoru/Aurora-Theme/issues"
@@ -11,7 +11,7 @@
         min="7.2.0">
 
 <CHANGES>
-###2026.10.22.2344
+###2026.10.22.2358
 - New colours, fonts, tables, buttons, dialogs and notification panel for the Black and White themes.
 - Optional sidebar navigation layout.
 - Page enhancements: brand and server card in the sidebar, slim top bar, page headings, status pills, Docker summary and filters.
@@ -63,6 +63,7 @@ $auroraCustomDir = '/boot/config/plugins/Aurora-Theme';
 $auroraClasses = [];
 if (($aurora['layout'] ?? 'top') == 'sidebar') $auroraClasses[] = 'tp-sidebar';
 if (($aurora['enhance'] ?? 'yes') == 'yes') $auroraClasses[] = 'tp-enhance';
+if (($aurora['style'] ?? 'aurora') == 'console') $auroraClasses[] = 'tp-console';
 // Display Settings, "Favorites enabled" set to No also turns off the theme's starred cards.
 if (($display['favorites'] ?? 'yes') == 'no') $auroraClasses[] = 'tp-no-favourites';
 
@@ -82,6 +83,9 @@ if (isset($themeHelper) && method_exists($themeHelper, 'isTopNavTheme') && !$the
 <?php if (!$auroraOff): ?>
 <?php if (($aurora['theme'] ?? 'yes') == 'yes'): ?>
 <link type="text/css" rel="stylesheet" href="<?php autov('/plugins/Aurora-Theme/styles/theme.css') ?>">
+<?php if (in_array('tp-console', $auroraClasses)): ?>
+<link type="text/css" rel="stylesheet" href="<?php autov('/plugins/Aurora-Theme/styles/console.css') ?>">
+<?php endif; ?>
 <?php
 // Display Settings, header custom text, secondary text and background colours: the theme sets
 // Unraid's header variables itself, so the chosen colours are handed to it under its own names.
@@ -339,6 +343,15 @@ document.getElementById('tft-accent').addEventListener('input', function () {
   if (/^#[0-9a-fA-F]{6}$/.test(code)) document.getElementById('tft-accent-pick').value = code;
 });
 </script>
+
+_(Style)_:
+: <select name="style">
+  <?=mk_option($aurora['style'] ?? 'aurora', "aurora", _("Aurora (default)"))?>
+  <?=mk_option($aurora['style'] ?? 'aurora', "console", _("Console: calm, dense, high contrast"))?>
+  </select>
+
+> Console uses flat surfaces, a single blue accent, status colours that pass contrast checks in
+> both modes, a stronger focus ring and no animation. An accent colour set above still applies.
 
 _(Navigation layout)_:
 : <select name="layout">
@@ -655,6 +668,7 @@ autoupdate_when="hourly"
 autoupdate_day="0"
 autoupdate_time="03:00"
 accent=""
+style="aurora"
 AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/fonts/inter-LICENSE.txt <<'AURORA_THEME_EOF'
 Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)
@@ -9419,6 +9433,137 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/stats.js <<'AURORA_THEME_EO
   window.addEventListener('resize', function () { hosts.forEach(function (host, index) { drawChart(host, CHARTS[index]); }); });
   setRange(range);
 })();
+AURORA_THEME_EOF
+cat > /usr/local/emhttp/plugins/Aurora-Theme/styles/console.css <<'AURORA_THEME_EOF'
+/*
+ * Console palette: a calm, dense colour set for Aurora Theme (Settings > Aurora Theme > Style).
+ * Loaded after theme.css and only when the style is "console"; it re-points the theme's --tp-*
+ * tokens, so every page, card and table follows without its own rules.
+ *   - Flat surfaces, thin borders, no gradients or glows.
+ *   - Blue marks actions; green, amber and red mark health only.
+ *   - Contrast: text 15.8:1 / 16.5:1, secondary text 7.1:1 / 7.5:1, status colours >= 5:1,
+ *     input outlines >= 3:1 (dark / light, on the card surface).
+ *   - A focus ring that shows on every surface, and no animation or transitions.
+ * An accent colour chosen in the settings still replaces the blue (its block comes later).
+ */
+
+/* ---- Dark (Unraid "Black") ---- */
+:root.tp-console.Theme--black {
+    --tp-bg: #0b1120;
+    --tp-elevated: #111a2e;
+    --tp-subtle: #18233a;
+    --tp-text: #e6ebf5;
+    --tp-muted: #9aa6bd;
+    --tp-border: #24324d;
+    --tp-input-border: #5d6f92;
+    --tp-primary: #5aa9ff;
+    --tp-primary-ii: #5aa9ff;
+    --tp-primary-soft: rgba(90, 169, 255, 0.14);
+    --tp-tab-active: #18233a;
+    --tp-primary-text: #06101f;
+    --tp-header-bg: var(--tp-custom-header-bg, #0b1120);
+    --tp-header-text: var(--tp-custom-header-text, #e6ebf5);
+    --tp-header-muted: var(--tp-custom-header-muted, #9aa6bd);
+    --tp-shadow-sm: none;
+    --tp-shadow-lg: 0 16px 40px -18px rgba(0, 0, 0, 0.7);
+    --tp-success: #4ade80;
+    --tp-success-bg: rgba(74, 222, 128, 0.12);
+    --tp-success-text: #4ade80;
+    --tp-danger: #f87171;
+    --tp-danger-soft: rgba(248, 113, 113, 0.12);
+    --tp-warn-bg: rgba(251, 191, 36, 0.12);
+    --tp-warn-text: #fbbf24;
+    --tp-neutral-bg: #18233a;
+    --tp-neutral-text: #c3cbdb;
+    --tp-focus: #ffffff;
+    --tp-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa6bd' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+
+    --tp-hsl-surface: 221 46% 12%;
+    --tp-hsl-text: 220 43% 93%;
+    --tp-hsl-subtle: 221 41% 16%;
+    --tp-hsl-muted: 219 21% 67%;
+    --tp-hsl-border: 220 36% 22%;
+    --tp-hsl-input: 220 22% 47%;
+    --tp-hsl-primary: 211 100% 68%;
+    --tp-hsl-primary-text: 216 68% 7%;
+}
+
+/* ---- Light (Unraid "White") ---- */
+:root.tp-console.Theme--white {
+    --tp-bg: #f4f6fa;
+    --tp-elevated: #ffffff;
+    --tp-subtle: #eef1f6;
+    --tp-text: #0f172a;
+    --tp-muted: #4b5567;
+    --tp-border: #d5dbe5;
+    --tp-input-border: #8994a8;
+    --tp-primary: #1d5fd1;
+    --tp-primary-ii: #1d5fd1;
+    --tp-primary-soft: rgba(29, 95, 209, 0.1);
+    --tp-tab-active: #ffffff;
+    --tp-primary-text: #ffffff;
+    --tp-header-bg: var(--tp-custom-header-bg, #0f172a);
+    --tp-header-text: var(--tp-custom-header-text, #ffffff);
+    --tp-header-muted: var(--tp-custom-header-muted, #aab4c8);
+    --tp-shadow-sm: none;
+    --tp-shadow-lg: 0 16px 40px -18px rgba(15, 23, 42, 0.25);
+    --tp-success: #15803d;
+    --tp-success-bg: #e3f4e9;
+    --tp-success-text: #15803d;
+    --tp-danger: #c0262d;
+    --tp-danger-soft: rgba(192, 38, 45, 0.08);
+    --tp-warn-bg: #fbf0dc;
+    --tp-warn-text: #a15c00;
+    --tp-neutral-bg: #eef1f6;
+    --tp-neutral-text: #374151;
+    --tp-focus: #0f172a;
+    --tp-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234b5567' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+
+    --tp-hsl-surface: 0 0% 100%;
+    --tp-hsl-text: 222 47% 11%;
+    --tp-hsl-subtle: 218 31% 95%;
+    --tp-hsl-muted: 219 16% 35%;
+    --tp-hsl-border: 218 24% 87%;
+    --tp-hsl-input: 219 15% 60%;
+    --tp-hsl-primary: 218 76% 47%;
+    --tp-hsl-primary-text: 0 0% 100%;
+}
+
+/* ---- Both modes: flatter shapes, a monospace face for data, no decorative gradient ---- */
+:root.tp-console:is(.Theme--black, .Theme--white) {
+    --tp-font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+    --tp-gradient: linear-gradient(var(--tp-primary), var(--tp-primary));
+    --tp-r-sm: 4px;
+    --tp-r-md: 8px;
+}
+
+/* Focus: accent outline plus a ring in the highest-contrast colour, visible on any surface,
+   including accent-coloured buttons. */
+:root.tp-console :focus-visible {
+    outline: 2px solid var(--tp-primary) !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 4px var(--tp-focus) !important;
+}
+
+/* Numbers line up in tables and cards. */
+:root.tp-console :is(table, .tp-card, .usage-disk, .dashboard) {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Paths, IP addresses and ports read as data. */
+:root.tp-console :is(code, kbd, samp, pre:not(.up), td.path, .tp-mono) {
+    font-family: var(--tp-font-mono);
+}
+
+/* No motion: state changes swap instantly. Applies to every plugin's animations too. */
+:root.tp-console *,
+:root.tp-console *::before,
+:root.tp-console *::after {
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+}
 AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/styles/enhance.css <<'AURORA_THEME_EOF'
 /* Elements added by scripts/enhance.js. Falls back to Unraid's own variables when the
@@ -20920,7 +21065,7 @@ cat > /boot/config/plugins/Aurora-Theme/stats.cron <<'AURORA_THEME_EOF'
 AURORA_THEME_EOF
 /usr/bin/php /usr/local/emhttp/plugins/Aurora-Theme/scripts/schedule.php
 echo ""
-echo "Aurora-Theme 2026.10.22.2344 is installed."
+echo "Aurora-Theme 2026.10.22.2358 is installed."
 echo "Settings: Settings > User Utilities > Aurora Theme"
 echo ""
 ]]>
