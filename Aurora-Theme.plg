@@ -3,7 +3,7 @@
 
 <PLUGIN name="Aurora-Theme"
         author="Tunefish"
-        version="2026.10.23.0026"
+        version="2026.10.23.0032"
         launch="Settings/AuroraThemeSettings"
         pluginURL="https://raw.githubusercontent.com/ldoctoru/Aurora-Theme/release/Aurora-Theme.plg"
         support="https://github.com/ldoctoru/Aurora-Theme/issues"
@@ -11,7 +11,7 @@
         min="7.2.0">
 
 <CHANGES>
-###2026.10.23.0026
+###2026.10.23.0032
 - New colours, fonts, tables, buttons, dialogs and notification panel for the Black and White themes.
 - Optional sidebar navigation layout.
 - Page enhancements: brand and server card in the sidebar, slim top bar, page headings, status pills, Docker summary and filters.
@@ -205,6 +205,7 @@ try {
 <script>window.auroraPageTitle = <?= json_encode($auroraTitle, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
 <?php endif; ?>
 <link type="text/css" rel="stylesheet" href="<?php autov('/plugins/Aurora-Theme/styles/enhance.css') ?>">
+<script>window.auroraHealth = <?= ($aurora['health'] ?? 'yes') == 'yes' ? 'true' : 'false' ?>; window.auroraDashboardGroups = <?= ($aurora['dashgroups'] ?? 'no') == 'yes' ? 'true' : 'false' ?>; window.auroraAppTiles = <?= ($aurora['apptiles'] ?? 'no') == 'yes' ? 'true' : 'false' ?>;</script>
 <script defer src="<?php autov('/plugins/Aurora-Theme/scripts/enhance.js') ?>"></script>
 <?php
 // Docker and VMs tabs and Dashboard: the saved groups go straight into the page, so the
@@ -218,7 +219,6 @@ if (in_array(rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PAT
 ?>
 <script>window.auroraDockerGroups = <?= json_encode($auroraGroups['docker'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
 <script>window.auroraVmGroups = <?= json_encode($auroraGroups['vm'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
-<script>window.auroraHealth = <?= ($aurora['health'] ?? 'yes') == 'yes' ? 'true' : 'false' ?>; window.auroraDashboardGroups = <?= ($aurora['dashgroups'] ?? 'no') == 'yes' ? 'true' : 'false' ?>;</script>
 <script>window.auroraDecimalMark = <?= json_encode(substr((string) ($display['number'] ?? '.,'), 0, 1) ?: '.') ?>;</script>
 <?php
     // FolderView installed: the switch above the Docker list chooses between its folders and the
@@ -383,7 +383,17 @@ _(Dashboard health strip)_:
   </select>
 
 > A row above the Dashboard tiles with the four most useful facts: failed or hot disks, parity,
-> app updates and unread alerts, problems first. Needs page enhancements.
+> app updates and unread alerts, problems first. Also shows a problem count in the top bar on
+> every page. Needs page enhancements.
+
+_(Dashboard app tiles)_:
+: <select name="apptiles">
+  <?=mk_option($aurora['apptiles'] ?? 'no', "no", _("Hidden"))?>
+  <?=mk_option($aurora['apptiles'] ?? 'no', "yes", _("Shown"))?>
+  </select>
+
+> A tile per container above the Dashboard tiles: running or stopped, how long, whether an update
+> is available, and an Open link to its WebUI. Running apps come first.
 
 _(Dashboard tile groups)_:
 : <select name="dashgroups">
@@ -698,6 +708,7 @@ accent=""
 style="aurora"
 health="yes"
 dashgroups="no"
+apptiles="no"
 AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/fonts/ibm-plex-LICENSE.txt <<'AURORA_THEME_EOF'
 Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"
@@ -6925,6 +6936,70 @@ function aurora_latest_release(): array
         : 'GitHub could not be reached: ' . trim(implode(' ', $download))];
 }
 AURORA_THEME_EOF
+cat > /usr/local/emhttp/plugins/Aurora-Theme/include/apps.php <<'AURORA_THEME_EOF'
+<?php
+// Containers for the Dashboard's app tiles.
+//   GET  returns {"apps": [{"name", "running", "status", "update", "webui"}, ...]}
+// "status" is Docker's own text ("Up 3 days", "Exited (0) 2 days ago"). "webui" is the
+// container's WebUI address from its Unraid template label, with [PORT:n] resolved to the host
+// port Docker publishes; [IP] is left for the page to fill with the address it was opened on.
+// Running containers first, then by name. Read-only.
+header('Content-Type: application/json');
+header('Cache-Control: no-store');
+
+if (!is_executable('/usr/bin/docker')) {
+    echo json_encode(['apps' => []]);
+    exit;
+}
+
+$format = '{{.Names}}\t{{.Image}}\t{{.State}}\t{{.Status}}\t{{.Ports}}\t{{.Label "net.unraid.docker.webui"}}';
+exec('/usr/bin/docker ps -a --format ' . escapeshellarg($format) . ' 2>/dev/null', $lines, $code);
+if ($code !== 0) {
+    http_response_code(502);
+    echo json_encode(['error' => 'docker is not running']);
+    exit;
+}
+
+$updates = json_decode((string) @file_get_contents('/var/lib/docker/unraid-update-status.json'), true);
+$updates = is_array($updates) ? $updates : [];
+
+$apps = [];
+foreach ($lines as $line) {
+    [$name, $image, $state, $status, $ports, $webui] = array_pad(explode("\t", $line, 6), 6, '');
+    if ($name === '') continue;
+
+    $tagged = (strpos($image, ':') === false || strrpos($image, ':') < (int) strrpos($image, '/')) ? "$image:latest" : $image;
+    $entry = $updates[$tagged] ?? null;
+    $update = is_array($entry) && ($entry['status'] ?? '') !== 'undef'
+        && !empty($entry['local']) && !empty($entry['remote']) && $entry['local'] !== $entry['remote'];
+
+    // "0.0.0.0:8097->8096/tcp, [::]:8097->8096/tcp" -> container port 8096 is host port 8097.
+    $published = [];
+    if (preg_match_all('/:(\d+)->(\d+)\/tcp/', $ports, $matches, PREG_SET_ORDER)) {
+        foreach ($matches as $match) $published[$match[2]] = $match[1];
+    }
+    $url = '';
+    if ($webui !== '') {
+        $url = preg_replace_callback('/\[PORT:(\d+)\]/i', function ($match) use ($published) {
+            return $published[$match[1]] ?? $match[1];
+        }, $webui);
+        if (!preg_match('#^https?://[^\s"<>]+$#i', $url)) $url = '';
+    }
+
+    $apps[] = [
+        'name' => $name,
+        'running' => $state === 'running',
+        'status' => $status,
+        'update' => $update,
+        'webui' => $url,
+    ];
+}
+
+usort($apps, function ($a, $b) {
+    return [$b['running'], strtolower($a['name'])] <=> [$a['running'], strtolower($b['name'])];
+});
+echo json_encode(['apps' => $apps], JSON_UNESCAPED_SLASHES);
+AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/include/check-update.php <<'AURORA_THEME_EOF'
 <?php
 // "Check for updates" on the settings page: compares the newest GitHub release with the
@@ -7190,11 +7265,14 @@ AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/include/health.php <<'AURORA_THEME_EOF'
 <?php
 // Server health for the Dashboard's health strip, read from Unraid's own state files.
-//   GET  returns {"items": [{"tone": "danger|warn|info|ok", "title": "...", "detail": "...", "href": "/Main"}, ...]}
+//   GET          returns {"items": [{"tone": "danger|warn|info|ok", "title": "...", "detail": "...", "href": "/Main"}, ...],
+//                         "counts": {"danger": n, "warn": n}}
+//   GET ?counts  only {"counts": ...}, without the Docker check, for the top bar on every page
 // Problems come first (danger, then warn, then info); "ok" items follow so the strip always
 // shows the four most useful facts. Read-only: nothing is changed here.
 header('Content-Type: application/json');
 header('Cache-Control: no-store');
+$countsOnly = isset($_GET['counts']);
 
 $var = (array) @parse_ini_file('/var/local/emhttp/var.ini');
 $disks = (array) @parse_ini_file('/var/local/emhttp/disks.ini', true);
@@ -7269,7 +7347,7 @@ if ($started && $resync === 0 && $synced > 0) {
 
 // ---- Apps: containers whose image has a newer version ----
 $status = json_decode((string) @file_get_contents('/var/lib/docker/unraid-update-status.json'), true);
-if (is_array($status) && is_executable('/usr/bin/docker')) {
+if (!$countsOnly && is_array($status) && is_executable('/usr/bin/docker')) {
     exec("/usr/bin/docker ps -a --format '{{.Names}}\t{{.Image}}' 2>/dev/null", $lines, $code);
     $updates = [];
     foreach ($code === 0 ? $lines : [] as $line) {
@@ -7308,9 +7386,16 @@ if ($started && !array_intersect($tones, ['danger']) && $disabled + $missing + $
 }
 if (!$alerts && !$warnings) $add('ok', 'No unread alerts', 'Notifications are clear', '/Tools/Notifications');
 
+$counts = ['danger' => 0, 'warn' => 0];
+foreach ($items as $item) if (isset($counts[$item['tone']])) $counts[$item['tone']]++;
+if ($countsOnly) {
+    echo json_encode(['counts' => $counts]);
+    exit;
+}
+
 $rank = ['danger' => 0, 'warn' => 1, 'info' => 2, 'ok' => 3];
 usort($items, function ($a, $b) use ($rank) { return $rank[$a['tone']] <=> $rank[$b['tone']]; });
-echo json_encode(['items' => array_slice($items, 0, 4)]);
+echo json_encode(['items' => array_slice($items, 0, 4), 'counts' => $counts]);
 AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/include/login-head.php <<'AURORA_THEME_EOF'
 <?php
@@ -9166,6 +9251,111 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
     })();
   }
 
+  // Top bar, every page: how many problems the health check finds (red and amber), as a pill
+  // that opens the Dashboard and its health strip. Hidden when there are none.
+  function alertPill() {
+    if (!window.auroraHealth) return;
+    const crumb = document.querySelector('#header .tp-crumb');
+    if (!crumb || crumb.querySelector('.tp-alert-pill')) return;
+    const pill = element('a', 'tp-alert-pill');
+    pill.href = '/Dashboard';
+    pill.hidden = true;
+    crumb.append(pill);
+    let failures = 0;
+    let timer = null;
+    function load() {
+      if (document.hidden) return;
+      fetch(PLUGIN_BASE + '/include/health.php?counts', { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (response) {
+          if (!response.ok) throw new Error('health counts failed with status ' + response.status);
+          return response.json();
+        })
+        .then(function (data) {
+          failures = 0;
+          const danger = Number((data.counts || {}).danger) || 0;
+          const warn = Number((data.counts || {}).warn) || 0;
+          const total = danger + warn;
+          pill.hidden = total === 0;
+          pill.className = 'tp-alert-pill ' + (danger ? 'tp-alert-danger' : 'tp-alert-warn');
+          pill.textContent = total + (total === 1 ? ' problem' : ' problems');
+          pill.title = 'Open the Dashboard to see ' + (total === 1 ? 'it' : 'them');
+        })
+        .catch(function (error) {
+          failures++;
+          if (failures >= 3) {
+            clearInterval(timer);
+            console.error('Aurora Theme alert count:', error);
+          }
+        });
+    }
+    load();
+    timer = setInterval(load, 120000);
+  }
+
+  // Dashboard: app tiles, one per container, as on Homepage or Homarr: running state, Docker's
+  // status text, an update notice and the WebUI link. Running apps first. From include/apps.php,
+  // refreshed every minute while the page is visible.
+  function dashboardApps() {
+    if (!window.auroraAppTiles) return;
+    const grid = document.querySelector('#displaybox div.frame');
+    if (!grid || !document.getElementById('db_box1')) return;
+    const section = element('section', 'tp-apps');
+    section.id = 'tp-dashboard-apps';
+    section.setAttribute('aria-labelledby', 'tp-apps-title');
+    const title = element('h2', 'tp-group-label', 'Apps');
+    title.id = 'tp-apps-title';
+    const list = element('ul', 'tp-apps-grid');
+    section.append(title, list);
+    let failures = 0;
+    let timer = null;
+
+    function tile(app) {
+      const item = element('li', 'tp-app-tile' + (app.running ? ' tp-app-running' : ' tp-app-stopped'));
+      const head = element('div', 'tp-app-head');
+      head.append(element('strong', 'tp-app-name', String(app.name)), element('span', 'tp-app-state', app.running ? 'Running' : 'Stopped'));
+      item.append(head, element('span', 'tp-app-status', String(app.status || '')));
+      const foot = element('div', 'tp-app-foot');
+      foot.append(element('span', 'tp-app-update' + (app.update ? ' tp-app-has-update' : ''), app.update ? 'Update available' : 'Up to date'));
+      const url = String(app.webui || '').replace(/\[IP\]/gi, location.hostname);
+      if (app.running && /^https?:\/\/[^\s"<>]+$/i.test(url)) {
+        const open = element('a', 'tp-app-open', 'Open');
+        open.href = url;
+        open.target = '_blank';
+        open.rel = 'noopener noreferrer';
+        open.setAttribute('aria-label', 'Open ' + app.name);
+        foot.append(open);
+      }
+      item.append(foot);
+      return item;
+    }
+
+    function load() {
+      if (document.hidden) return;
+      fetch(PLUGIN_BASE + '/include/apps.php', { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (response) {
+          if (!response.ok) throw new Error('apps failed with status ' + response.status);
+          return response.json();
+        })
+        .then(function (data) {
+          failures = 0;
+          const apps = Array.isArray(data.apps) ? data.apps : [];
+          if (!apps.length) { section.remove(); return; }
+          list.replaceChildren(...apps.map(tile));
+          if (!section.isConnected) grid.before(section);
+        })
+        .catch(function (error) {
+          failures++;
+          if (failures >= 3) {
+            clearInterval(timer);
+            console.error('Aurora Theme app tiles:', error);
+          }
+        });
+    }
+    load();
+    timer = setInterval(load, 60000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
+  }
+
   // Dashboard load charts are drawn by SmoothieCharts on a canvas, so CSS cannot colour them.
   // Their options are adjusted once: theme colours, a thicker smooth line with a soft fill.
   function dashboardCharts() {
@@ -9199,6 +9389,11 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
         entry.options.fillStyle = chart.seriesSet.length === 1 ? soft(colour, 0.12) : undefined;
       });
     });
+    // Processor chart: a thin amber line at 80% load, so a sustained high load is easy to spot.
+    // (SmoothieCharts draws horizontal lines solid; it has no dashed style.)
+    if (window.cpuchart && window.cpuchart.options) {
+      window.cpuchart.options.horizontalLines = [{ value: 80, color: soft(token('--tp-warn-text', '#f59e0b'), 0.7), lineWidth: 1 }];
+    }
   }
 
   // Dashboard, processor tile: Unraid fills it from the Unraid API's live feed only, so it shows
@@ -11453,7 +11648,7 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
 
   function start() {
     const info = pageInfo();
-    [function () { topBar(info); }, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardHealth, dashboardSummary, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
+    [function () { topBar(info); }, alertPill, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardHealth, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
       // One failing enhancer must not stop the others or the page's own scripts.
       try { enhancer(); } catch (error) { console.error('Aurora Theme:', error); }
     });
@@ -15960,6 +16155,113 @@ tbody.tp-cpu-tile > tr.tp-core-pair .usage-disk {
     font: 600 1.1rem var(--tp-font-heading, inherit);
     letter-spacing: 0.08em;
     text-transform: uppercase;
+}
+
+/* ---- Top bar problem count (alertPill) ---- */
+.tp-alert-pill {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.8rem;
+    padding: 0.2rem 0.9rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    text-decoration: none !important;
+    white-space: nowrap;
+}
+
+.tp-alert-pill[hidden] { display: none; }
+.tp-alert-warn { color: var(--tp-warn-text, #f59e0b) !important; }
+.tp-alert-danger { color: var(--tp-danger, #ef4444) !important; }
+
+/* ---- Dashboard app tiles (dashboardApps) ---- */
+.tp-apps {
+    margin: 0 0 1.4rem;
+}
+
+.tp-apps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.tp-app-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    min-width: 0;
+    margin: 0;
+    padding: 1.2rem 1.4rem;
+    border: 1px solid var(--tp-border, var(--table-border-color));
+    border-radius: var(--tp-r-md, 12px);
+    background-color: var(--tp-elevated, var(--table-background-color));
+}
+
+.tp-app-head,
+.tp-app-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    min-width: 0;
+}
+
+.tp-app-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tp-app-state {
+    flex: none;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+/* Shape as well as colour: a filled dot for running, a ring for stopped. */
+.tp-app-state:before {
+    display: inline-block;
+    width: 0.8rem;
+    height: 0.8rem;
+    margin-right: 0.5rem;
+    border-radius: 50%;
+    content: "";
+    vertical-align: 0.05rem;
+}
+
+.tp-app-running .tp-app-state { color: var(--tp-success-text, #22c55e); }
+.tp-app-running .tp-app-state:before { background-color: currentColor; }
+.tp-app-stopped .tp-app-state { color: var(--tp-muted, var(--alt-text-color)); }
+.tp-app-stopped .tp-app-state:before { box-shadow: inset 0 0 0 2px currentColor; }
+.tp-app-stopped .tp-app-name { color: var(--tp-muted, var(--alt-text-color)); }
+
+.tp-app-status,
+.tp-app-update {
+    overflow: hidden;
+    color: var(--tp-muted, var(--alt-text-color));
+    font-size: 1.2rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Update available: amber with a triangle, so it is not told apart by colour alone. */
+.tp-app-has-update {
+    color: var(--tp-warn-text, #f59e0b);
+    font-weight: 600;
+}
+
+.tp-app-has-update:before {
+    content: "\25B2\00A0";
+}
+
+.tp-app-open {
+    flex: none;
+    font-size: 1.2rem;
+    font-weight: 600;
 }
 AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/styles/layout-sidebar.css <<'AURORA_THEME_EOF'
@@ -23664,7 +23966,7 @@ cat > /boot/config/plugins/Aurora-Theme/stats.cron <<'AURORA_THEME_EOF'
 AURORA_THEME_EOF
 /usr/bin/php /usr/local/emhttp/plugins/Aurora-Theme/scripts/schedule.php
 echo ""
-echo "Aurora-Theme 2026.10.23.0026 is installed."
+echo "Aurora-Theme 2026.10.23.0032 is installed."
 echo "Settings: Settings > User Utilities > Aurora Theme"
 echo ""
 ]]>
