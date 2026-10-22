@@ -1,10 +1,10 @@
 <?php
-// Server health for the Dashboard's health strip, read from Unraid's own state files.
+// Server health, read from Unraid's own state files. The top bar's problem count uses ?counts.
 //   GET          returns {"items": [{"tone": "danger|warn|info|ok", "title": "...", "detail": "...", "href": "/Main"}, ...],
 //                         "counts": {"danger": n, "warn": n}}
 //   GET ?counts  only {"counts": ...}, without the Docker check, for the top bar on every page
-// Problems come first (danger, then warn, then info); "ok" items follow so the strip always
-// shows the four most useful facts. Read-only: nothing is changed here.
+// Problems come first (danger, then warn, then info); "ok" items follow, so the list always
+// starts with the four most useful facts. Read-only: nothing is changed here.
 header('Content-Type: application/json');
 header('Cache-Control: no-store');
 $countsOnly = isset($_GET['counts']);
