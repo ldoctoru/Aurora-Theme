@@ -3,7 +3,7 @@
 
 <PLUGIN name="Aurora-Theme"
         author="Tunefish"
-        version="2026.10.23.0020"
+        version="2026.10.23.0026"
         launch="Settings/AuroraThemeSettings"
         pluginURL="https://raw.githubusercontent.com/ldoctoru/Aurora-Theme/release/Aurora-Theme.plg"
         support="https://github.com/ldoctoru/Aurora-Theme/issues"
@@ -11,7 +11,7 @@
         min="7.2.0">
 
 <CHANGES>
-###2026.10.23.0020
+###2026.10.23.0026
 - New colours, fonts, tables, buttons, dialogs and notification panel for the Black and White themes.
 - Optional sidebar navigation layout.
 - Page enhancements: brand and server card in the sidebar, slim top bar, page headings, status pills, Docker summary and filters.
@@ -218,6 +218,7 @@ if (in_array(rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PAT
 ?>
 <script>window.auroraDockerGroups = <?= json_encode($auroraGroups['docker'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
 <script>window.auroraVmGroups = <?= json_encode($auroraGroups['vm'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
+<script>window.auroraHealth = <?= ($aurora['health'] ?? 'yes') == 'yes' ? 'true' : 'false' ?>; window.auroraDashboardGroups = <?= ($aurora['dashgroups'] ?? 'no') == 'yes' ? 'true' : 'false' ?>;</script>
 <script>window.auroraDecimalMark = <?= json_encode(substr((string) ($display['number'] ?? '.,'), 0, 1) ?: '.') ?>;</script>
 <?php
     // FolderView installed: the switch above the Docker list chooses between its folders and the
@@ -374,6 +375,25 @@ _(Page enhancements)_:
   <?=mk_option($aurora['enhance'], "yes", _("Enabled"))?>
   <?=mk_option($aurora['enhance'], "no", _("Disabled"))?>
   </select>
+
+_(Dashboard health strip)_:
+: <select name="health">
+  <?=mk_option($aurora['health'] ?? 'yes', "yes", _("Shown"))?>
+  <?=mk_option($aurora['health'] ?? 'yes', "no", _("Hidden"))?>
+  </select>
+
+> A row above the Dashboard tiles with the four most useful facts: failed or hot disks, parity,
+> app updates and unread alerts, problems first. Needs page enhancements.
+
+_(Dashboard tile groups)_:
+: <select name="dashgroups">
+  <?=mk_option($aurora['dashgroups'] ?? 'no', "no", _("As arranged"))?>
+  <?=mk_option($aurora['dashgroups'] ?? 'no', "yes", _("Grouped: System, Apps and shares, Storage"))?>
+  </select>
+
+> Grouped puts every tile in its column by kind and labels the columns, as on TrueNAS. It saves
+> the order the same way dragging a tile does, so tiles you move are put back in their group on
+> the next visit. Tiles from other plugins that the theme does not recognise stay where they are.
 
 > Adds elements Unraid does not have, such as the summary strip above the Docker container list.
 
@@ -676,6 +696,8 @@ autoupdate_day="0"
 autoupdate_time="03:00"
 accent=""
 style="aurora"
+health="yes"
+dashgroups="no"
 AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/fonts/ibm-plex-LICENSE.txt <<'AURORA_THEME_EOF'
 Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"
@@ -7165,6 +7187,131 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 $stored = json_decode((string) @file_get_contents(TFT_FAVOURITES_FILE), true);
 echo json_encode(['favourites' => tft_clean_favourites($stored['favourites'] ?? [])]);
 AURORA_THEME_EOF
+cat > /usr/local/emhttp/plugins/Aurora-Theme/include/health.php <<'AURORA_THEME_EOF'
+<?php
+// Server health for the Dashboard's health strip, read from Unraid's own state files.
+//   GET  returns {"items": [{"tone": "danger|warn|info|ok", "title": "...", "detail": "...", "href": "/Main"}, ...]}
+// Problems come first (danger, then warn, then info); "ok" items follow so the strip always
+// shows the four most useful facts. Read-only: nothing is changed here.
+header('Content-Type: application/json');
+header('Cache-Control: no-store');
+
+$var = (array) @parse_ini_file('/var/local/emhttp/var.ini');
+$disks = (array) @parse_ini_file('/var/local/emhttp/disks.ini', true);
+// Unraid's display settings (temperature limits) and notification folder: defaults, then the user's.
+$dynamix = array_replace_recursive(
+    (array) @parse_ini_file('/usr/local/emhttp/plugins/dynamix/default.cfg', true),
+    (array) @parse_ini_file('/boot/config/plugins/dynamix/dynamix.cfg', true)
+);
+$display = (array) ($dynamix['display'] ?? []);
+
+$items = [];
+$add = function (string $tone, string $title, string $detail, string $href) use (&$items) {
+    $items[] = ['tone' => $tone, 'title' => $title, 'detail' => $detail, 'href' => $href];
+};
+$plural = function (int $n, string $one, string $many): string {
+    return $n . ' ' . ($n === 1 ? $one : $many);
+};
+
+// ---- Array state and running operation (parity check, rebuild, clear) ----
+$started = ($var['mdState'] ?? '') === 'STARTED';
+$disabled = (int) ($var['mdNumDisabled'] ?? 0);
+$invalid = (int) ($var['mdNumInvalid'] ?? 0);
+$missing = (int) ($var['mdNumMissing'] ?? 0);
+if (!$started) {
+    $add('warn', 'Array stopped', 'Shares, apps and VMs on the array are unavailable.', '/Main');
+} elseif ($disabled + $missing > 0) {
+    $add('danger', $plural($disabled + $missing, 'disk disabled', 'disks disabled'), 'Data is emulated from parity. Replace or rebuild the disk.', '/Main');
+} elseif ($invalid > 0) {
+    $add('warn', $plural($invalid, 'disk invalid', 'disks invalid'), 'Parity is not protecting all data.', '/Main');
+}
+$resync = (int) ($var['mdResync'] ?? 0);
+if ($started && $resync > 0) {
+    $size = (float) ($var['mdResyncSize'] ?? 0);
+    $pos = (float) ($var['mdResyncPos'] ?? 0);
+    $percent = $size > 0 ? floor($pos / $size * 100) : 0;
+    $add('info', 'Array operation running', "$percent% done", '/Main');
+}
+
+// ---- Disks: failures, read errors, temperature against Unraid's own limits ----
+$failed = $errors = $hot = $critical = [];
+foreach ($disks as $name => $disk) {
+    if (!is_array($disk) || ($disk['device'] ?? '') === '') continue;
+    $label = ucfirst((string) ($disk['name'] ?? $name));
+    $color = strtolower((string) strtok((string) ($disk['color'] ?? ''), '-'));
+    if ($color === 'red') $failed[] = $label;
+    if ((int) ($disk['numErrors'] ?? 0) > 0) $errors[] = $label;
+    $temp = $disk['temp'] ?? '*';
+    if (!is_numeric($temp)) continue;
+    $ssd = ($disk['rotational'] ?? '1') === '0';
+    $hotLimit = (isset($disk['hotTemp']) && (int) $disk['hotTemp'] >= 0 && $disk['hotTemp'] !== '') ? (int) $disk['hotTemp']
+        : (int) ($ssd && (int) ($display['hotssd'] ?? -1) >= 0 ? $display['hotssd'] : ($display['hot'] ?? 45));
+    $maxLimit = (isset($disk['maxTemp']) && (int) $disk['maxTemp'] >= 0 && $disk['maxTemp'] !== '') ? (int) $disk['maxTemp']
+        : (int) ($ssd && (int) ($display['maxssd'] ?? -1) >= 0 ? $display['maxssd'] : ($display['max'] ?? 55));
+    if ($maxLimit > 0 && $temp >= $maxLimit) $critical[] = "$label {$temp} °C";
+    elseif ($hotLimit > 0 && $temp >= $hotLimit) $hot[] = "$label {$temp} °C";
+}
+if ($failed) $add('danger', $plural(count($failed), 'disk failing', 'disks failing'), implode(', ', $failed), '/Main');
+if ($critical) $add('danger', 'Disk overheating', implode(', ', $critical), '/Main');
+if ($errors) $add('warn', 'Disk read errors', implode(', ', $errors), '/Main');
+if ($hot) $add('warn', count($hot) === 1 ? 'Disk hot' : count($hot) . ' disks hot', implode(', ', $hot), '/Main');
+
+// ---- Parity: last check and its errors ----
+$synced = (int) ($var['sbSynced'] ?? 0);
+$syncErrors = (int) ($var['sbSyncErrs'] ?? 0);
+if ($started && $resync === 0 && $synced > 0) {
+    $days = (int) floor((time() - $synced) / 86400);
+    $when = $days === 0 ? 'today' : ($days === 1 ? 'yesterday' : "$days days ago");
+    if ($syncErrors > 0) $add('warn', 'Parity errors found', $plural($syncErrors, 'error', 'errors') . " in the last check ($when)", '/Main');
+    elseif ($days > 45) $add('info', 'Parity check overdue', "Last check $when", '/Settings/Scheduler');
+    else $add('ok', 'Parity valid', "Last check $when, no errors", '/Main');
+}
+
+// ---- Apps: containers whose image has a newer version ----
+$status = json_decode((string) @file_get_contents('/var/lib/docker/unraid-update-status.json'), true);
+if (is_array($status) && is_executable('/usr/bin/docker')) {
+    exec("/usr/bin/docker ps -a --format '{{.Names}}\t{{.Image}}' 2>/dev/null", $lines, $code);
+    $updates = [];
+    foreach ($code === 0 ? $lines : [] as $line) {
+        [$container, $image] = array_pad(explode("\t", $line, 2), 2, '');
+        if (strpos($image, ':') === false || strrpos($image, ':') < strrpos($image, '/')) $image .= ':latest';
+        $entry = $status[$image] ?? null;
+        if (is_array($entry) && ($entry['status'] ?? '') !== 'undef' && !empty($entry['local']) && !empty($entry['remote']) && $entry['local'] !== $entry['remote']) {
+            $updates[] = $container;
+        }
+    }
+    if ($updates) {
+        $shown = array_slice($updates, 0, 3);
+        $add('info', $plural(count($updates), 'app update', 'app updates'), implode(', ', $shown) . (count($updates) > 3 ? ', …' : ''), '/Docker');
+    } elseif ($code === 0 && $lines) {
+        $add('ok', 'Apps up to date', $plural(count($lines), 'container', 'containers'), '/Docker');
+    }
+}
+
+// ---- Unread notifications that need attention ----
+$alerts = $warnings = 0;
+$path = (string) ($dynamix['notify']['path'] ?? '') ?: '/tmp/notifications';
+foreach (glob(rtrim($path, '/') . '/unread/*.notify') ?: [] as $file) {
+    $note = (array) @parse_ini_file($file);
+    $importance = (string) ($note['importance'] ?? 'normal');
+    if ($importance === 'alert') $alerts++;
+    elseif ($importance === 'warning') $warnings++;
+}
+if ($alerts) $add('danger', $plural($alerts, 'unread alert', 'unread alerts'), 'Open notifications to review them.', '/Tools/Notifications');
+elseif ($warnings) $add('warn', $plural($warnings, 'unread warning', 'unread warnings'), 'Open notifications to review them.', '/Tools/Notifications');
+
+// ---- Fill with good news when nothing is wrong ----
+$tones = array_column($items, 'tone');
+if ($started && !array_intersect($tones, ['danger']) && $disabled + $missing + $invalid === 0 && !$failed) {
+    $count = count(array_filter($disks, function ($d) { return is_array($d) && ($d['device'] ?? '') !== '' && ($d['type'] ?? '') !== 'Flash'; }));
+    $add('ok', 'Array healthy', $plural($count, 'disk', 'disks') . ' online', '/Main');
+}
+if (!$alerts && !$warnings) $add('ok', 'No unread alerts', 'Notifications are clear', '/Tools/Notifications');
+
+$rank = ['danger' => 0, 'warn' => 1, 'info' => 2, 'ok' => 3];
+usort($items, function ($a, $b) use ($rank) { return $rank[$a['tone']] <=> $rank[$b['tone']]; });
+echo json_encode(['items' => array_slice($items, 0, 4)]);
+AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/include/login-head.php <<'AURORA_THEME_EOF'
 <?php
 // Aurora Theme on the login page. The plugin's install script adds one line to Unraid's login
@@ -8862,6 +9009,161 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
     });
     if (arrayHeader) watch.observe(arrayHeader, { childList: true, characterData: true, subtree: true });
     render();
+  }
+
+  // Dashboard: health strip above the tiles, from include/health.php. Problems first (red, amber,
+  // blue), then good news, so the four most useful facts are always in view. Each state has its
+  // own icon shape as well as its colour. Refreshed every minute while the page is visible.
+  function dashboardHealth() {
+    if (!window.auroraHealth) return;
+    const grid = document.querySelector('#displaybox div.frame');
+    if (!grid || !document.getElementById('db_box1')) return;
+    const SVG = 'http://www.w3.org/2000/svg';
+    const SHAPES = {
+      danger: ['path', { d: 'M5.1 1h5.8L15 5.1v5.8L10.9 15H5.1L1 10.9V5.1z' }],
+      warn: ['path', { d: 'M8 1.2L15.2 14H.8z' }],
+      info: ['circle', { cx: '8', cy: '8', r: '7' }],
+      ok: ['circle', { cx: '8', cy: '8', r: '7' }],
+    };
+    const MARKS = {
+      danger: 'M5.8 5.8l4.4 4.4M10.2 5.8l-4.4 4.4',
+      warn: 'M8 6v3.6M8 11.6v.1',
+      info: 'M8 7.2v4M8 4.6v.1',
+      ok: 'M4.8 8.2l2.1 2.1 4.3-4.6',
+    };
+    function icon(tone) {
+      const svg = document.createElementNS(SVG, 'svg');
+      svg.setAttribute('viewBox', '0 0 16 16');
+      svg.setAttribute('aria-hidden', 'true');
+      svg.setAttribute('class', 'tp-health-icon');
+      const shape = document.createElementNS(SVG, SHAPES[tone][0]);
+      Object.entries(SHAPES[tone][1]).forEach(function (pair) { shape.setAttribute(pair[0], pair[1]); });
+      const mark = document.createElementNS(SVG, 'path');
+      mark.setAttribute('d', MARKS[tone]);
+      mark.setAttribute('class', 'tp-health-mark');
+      svg.append(shape, mark);
+      return svg;
+    }
+    const strip = element('ul', 'tp-health');
+    strip.id = 'tp-dashboard-health';
+    strip.setAttribute('aria-label', 'Server health');
+    let failures = 0;
+    let timer = null;
+
+    function render(items) {
+      strip.replaceChildren(...items.map(function (item) {
+        const tone = Object.prototype.hasOwnProperty.call(SHAPES, item.tone) ? item.tone : 'info';
+        const li = element('li', 'tp-health-item tp-health-' + tone);
+        const link = element('a', 'tp-health-link');
+        link.href = /^\/[A-Za-z0-9/_?=.-]*$/.test(item.href || '') ? item.href : '/Dashboard';
+        const text = element('span', 'tp-health-text');
+        text.append(element('strong', 'tp-health-title', String(item.title || '')), element('span', 'tp-health-detail', String(item.detail || '')));
+        link.append(icon(tone), text);
+        li.append(link);
+        return li;
+      }));
+      // Above the summary strip (uptime, CPU, memory, array) when that is shown.
+      if (!strip.isConnected) (document.getElementById('tp-dashboard-summary') || grid).before(strip);
+    }
+
+    function load() {
+      if (document.hidden) return;
+      fetch(PLUGIN_BASE + '/include/health.php', { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (response) {
+          if (!response.ok) throw new Error('health failed with status ' + response.status);
+          return response.json();
+        })
+        .then(function (data) {
+          failures = 0;
+          if (Array.isArray(data.items) && data.items.length) render(data.items);
+        })
+        .catch(function (error) {
+          failures++;
+          if (failures >= 3) {
+            clearInterval(timer);
+            console.error('Aurora Theme health strip:', error);
+          }
+        });
+    }
+
+    load();
+    timer = setInterval(load, 60000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
+  }
+
+  // Dashboard: tiles grouped by kind, as on TrueNAS. Column 1 System (server, processor, memory,
+  // network, power, fans, GPU), column 2 Apps and shares, column 3 Storage. Tiles the theme does
+  // not recognise stay in their column. Uses Unraid's own layout record (the page's "cookie"
+  // object and saveCookie()), so the order is saved the same way a drag saves it. Tiles are
+  // recognised by their id or settings link, not their translated title.
+  function dashboardGrouping() {
+    if (!window.auroraDashboardGroups) return;
+    const boxes = ['db_box1', 'db_box2', 'db_box3'].map(function (id) { return document.getElementById(id); });
+    if (boxes.some(function (box) { return !box; })) return;
+    const LABELS = ['System', 'Apps and shares', 'Storage'];
+
+    function kind(tile) {
+      if (tile.classList.contains('system') || /^tblGPUDash/.test(tile.id)) return 0;
+      if (/^(docker_view|vm_view|vm_view_usage)$/.test(tile.id)) return 1;
+      if (/^(array_list|pool_list\d*|devs_list)$/.test(tile.id)) return 2;
+      const header = tile.querySelector('tr');
+      const targets = header ? [...header.querySelectorAll('a[href], a[onclick]')].map(function (link) {
+        return (link.getAttribute('href') || '') + ' ' + (link.getAttribute('onclick') || '');
+      }).join(' ') : '';
+      if (/CPUset|Processes|NetworkSettings|UPSsettings|FanSettings|VPNmanager|InfoButton/.test(targets)) return 0;
+      if (/\/(Shares|Users)\b/.test(targets)) return 1;
+      if (/Scheduler|DiskSettings|Device\?name=/.test(targets)) return 2;
+      return -1;
+    }
+
+    function labels() {
+      boxes.forEach(function (box, index) {
+        if (box.previousElementSibling && box.previousElementSibling.classList.contains('tp-group-label')) return;
+        const label = element('h2', 'tp-group-label', LABELS[index]);
+        box.before(label);
+      });
+    }
+
+    function group() {
+      const tiles = boxes.map(function (box) { return [...box.querySelectorAll(':scope > tbody')]; });
+      // Unraid gives every tile its "sort" key when the page starts; wait until it has.
+      if (tiles.flat().some(function (tile) { return !tile.getAttribute('sort'); })) return false;
+      const target = [[], [], []];
+      tiles.forEach(function (list, column) {
+        list.forEach(function (tile) {
+          const k = kind(tile);
+          target[k < 0 ? column : k].push(tile);
+        });
+      });
+      let changed = false;
+      target.forEach(function (list, column) {
+        const box = boxes[column];
+        list.forEach(function (tile) {
+          if (tile.parentElement !== box) changed = true;
+          // Each tile has a spacer (thead.stopgap) just before it; they move together.
+          const gap = tile.previousElementSibling && tile.previousElementSibling.matches('thead.stopgap') ? tile.previousElementSibling : null;
+          if (gap) box.append(gap);
+          box.append(tile);
+        });
+        const order = list.map(function (tile) { return tile.getAttribute('sort'); }).join(';');
+        if (window.cookie && typeof window.cookie === 'object' && window.cookie[box.id] !== order) {
+          window.cookie[box.id] = order;
+          changed = true;
+        }
+        // A column that ends up empty is hidden, as Unraid does after a drag.
+        const tileBox = box.closest('div.tile');
+        if (tileBox) tileBox.style.display = list.some(function (tile) { return tile.style.display !== 'none'; }) ? '' : 'none';
+      });
+      if (changed && typeof window.saveCookie === 'function') window.saveCookie();
+      labels();
+      return true;
+    }
+
+    let tries = 0;
+    (function attempt() {
+      if (group() || ++tries > 20) return;
+      setTimeout(attempt, 250);
+    })();
   }
 
   // Dashboard load charts are drawn by SmoothieCharts on a canvas, so CSS cannot colour them.
@@ -11151,7 +11453,7 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
 
   function start() {
     const info = pageInfo();
-    [function () { topBar(info); }, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardSummary, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
+    [function () { topBar(info); }, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardHealth, dashboardSummary, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
       // One failing enhancer must not stop the others or the page's own scripts.
       try { enhancer(); } catch (error) { console.error('Aurora Theme:', error); }
     });
@@ -15570,6 +15872,94 @@ tbody.tp-cpu-tile > tr.tp-core-pair .load {
 
 tbody.tp-cpu-tile > tr.tp-core-pair .usage-disk {
     height: 0.35rem !important;
+}
+
+/* ---- Dashboard health strip (scripts/enhance.js, dashboardHealth) ----
+   Four cells, problems first. Each state has its own shape and colour, so it reads without
+   colour vision: octagon (failed), triangle (needs attention), circle with i (information),
+   circle with a tick (fine). */
+.tp-health {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+    gap: 1px;
+    margin: 0 0 1.4rem;
+    padding: 0;
+    overflow: hidden;
+    list-style: none;
+    border: 1px solid var(--tp-border, var(--table-border-color));
+    border-radius: var(--tp-r-md, 12px);
+    background-color: var(--tp-border, var(--table-border-color));
+}
+
+.tp-health-item {
+    display: flex;
+    margin: 0;
+    background-color: var(--tp-elevated, var(--table-background-color));
+}
+
+.tp-health-link {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 1rem;
+    min-height: 4.4rem;
+    padding: 1rem 1.6rem;
+    color: var(--tp-text, var(--text-color)) !important;
+    text-decoration: none !important;
+}
+
+.tp-health-link:hover {
+    background-color: var(--tp-subtle, transparent);
+}
+
+.tp-health-icon {
+    flex: none;
+    width: 1.8rem;
+    height: 1.8rem;
+}
+
+.tp-health-icon .tp-health-mark {
+    fill: none;
+    stroke: var(--tp-elevated, var(--table-background-color));
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.tp-health-danger .tp-health-icon { fill: var(--tp-danger, #ef4444); }
+.tp-health-warn .tp-health-icon { fill: var(--tp-warn-text, #f59e0b); }
+.tp-health-info .tp-health-icon { fill: var(--tp-primary, #4f8bff); }
+.tp-health-ok .tp-health-icon { fill: var(--tp-success-text, #22c55e); }
+
+.tp-health-danger { box-shadow: inset 3px 0 0 var(--tp-danger, #ef4444); }
+.tp-health-warn { box-shadow: inset 3px 0 0 var(--tp-warn-text, #f59e0b); }
+
+.tp-health-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.tp-health-title {
+    font-weight: 600;
+}
+
+.tp-health-detail {
+    overflow: hidden;
+    color: var(--tp-muted, var(--alt-text-color));
+    font-size: 1.2rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Dashboard column labels when tiles are grouped (dashboardGrouping) ---- */
+.tp-group-label {
+    margin: 0 0 0.8rem;
+    padding: 0 0.4rem;
+    color: var(--tp-muted, var(--alt-text-color));
+    font: 600 1.1rem var(--tp-font-heading, inherit);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/styles/layout-sidebar.css <<'AURORA_THEME_EOF'
@@ -23274,7 +23664,7 @@ cat > /boot/config/plugins/Aurora-Theme/stats.cron <<'AURORA_THEME_EOF'
 AURORA_THEME_EOF
 /usr/bin/php /usr/local/emhttp/plugins/Aurora-Theme/scripts/schedule.php
 echo ""
-echo "Aurora-Theme 2026.10.23.0020 is installed."
+echo "Aurora-Theme 2026.10.23.0026 is installed."
 echo "Settings: Settings > User Utilities > Aurora Theme"
 echo ""
 ]]>
