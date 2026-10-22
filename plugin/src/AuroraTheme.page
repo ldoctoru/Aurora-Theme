@@ -11,6 +11,7 @@ $auroraClasses = [];
 if (($aurora['layout'] ?? 'top') == 'sidebar') $auroraClasses[] = 'tp-sidebar';
 if (($aurora['enhance'] ?? 'yes') == 'yes') $auroraClasses[] = 'tp-enhance';
 if (($aurora['style'] ?? 'aurora') == 'console') $auroraClasses[] = 'tp-console';
+if (($aurora['style'] ?? 'aurora') == 'nexus') $auroraClasses[] = 'tp-nexus';
 // Display Settings, "Favorites enabled" set to No also turns off the theme's starred cards.
 if (($display['favorites'] ?? 'yes') == 'no') $auroraClasses[] = 'tp-no-favourites';
 
@@ -32,6 +33,9 @@ if (isset($themeHelper) && method_exists($themeHelper, 'isTopNavTheme') && !$the
 <link type="text/css" rel="stylesheet" href="<?php autov('/plugins/Aurora-Theme/styles/theme.css') ?>">
 <?php if (in_array('tp-console', $auroraClasses)): ?>
 <link type="text/css" rel="stylesheet" href="<?php autov('/plugins/Aurora-Theme/styles/console.css') ?>">
+<?php endif; ?>
+<?php if (in_array('tp-nexus', $auroraClasses)): ?>
+<link type="text/css" rel="stylesheet" href="<?php autov('/plugins/Aurora-Theme/styles/nexus.css') ?>">
 <?php endif; ?>
 <?php
 // Display Settings, header custom text, secondary text and background colours: the theme sets
