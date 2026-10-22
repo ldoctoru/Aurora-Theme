@@ -1,0 +1,169 @@
+/*
+ * Nexus style for Aurora Theme (Settings > Aurora Theme > Style): Unraid's orange identity,
+ * TrueNAS-style grouped widgets and Aurora's layout, on a graphite ground.
+ * Loaded after theme.css only when the style is "nexus"; it re-points the theme's --tp-* tokens.
+ *   - Orange marks identity only (current menu item). Blue marks actions and data.
+ *     Green, amber and red mark health only.
+ *   - IBM Plex Sans for text, IBM Plex Mono for data (bundled, SIL Open Font License,
+ *     see fonts/ibm-plex-LICENSE.txt).
+ *   - Measured contrast on the card surface (dark / light): text 14.6 / 17.7, secondary 7.0 / 7.6,
+ *     accent 6.7 / 5.7, green 7.1 / 5.1, amber 9.7 / 4.9, red 5.4 / 5.4, input outlines 3.6 / 3.1.
+ * An accent colour chosen in the settings still replaces the blue (its block comes later).
+ */
+
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("/plugins/Aurora-Theme/fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("/plugins/Aurora-Theme/fonts/ibm-plex-sans-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url("/plugins/Aurora-Theme/fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url("/plugins/Aurora-Theme/fonts/ibm-plex-sans-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("/plugins/Aurora-Theme/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("/plugins/Aurora-Theme/fonts/ibm-plex-mono-latin-500-normal.woff2") format("woff2"); }
+
+/* ---- Dark (Unraid "Black") ---- */
+:root.tp-nexus.Theme--black {
+    --tp-bg: #0e1116;
+    --tp-elevated: #13171d;
+    --tp-subtle: #1a212b;
+    --tp-text: #e4e8ee;
+    --tp-muted: #98a2b3;
+    --tp-border: #232a35;
+    --tp-input-border: #5d6f92;
+    --tp-primary: #4ea1ff;
+    --tp-primary-ii: #4ea1ff;
+    --tp-primary-soft: rgba(78, 161, 255, 0.14);
+    --tp-tab-active: #1a212b;
+    --tp-primary-text: #071422;
+    --tp-brand: #ff8c2f;
+    --tp-header-bg: var(--tp-custom-header-bg, #090b0f);
+    --tp-header-text: var(--tp-custom-header-text, #e4e8ee);
+    --tp-header-muted: var(--tp-custom-header-muted, #98a2b3);
+    --tp-shadow-sm: none;
+    --tp-shadow-lg: 0 16px 40px -18px rgba(0, 0, 0, 0.75);
+    --tp-success: #3fb950;
+    --tp-success-bg: rgba(63, 185, 80, 0.12);
+    --tp-success-text: #3fb950;
+    --tp-danger: #f85149;
+    --tp-danger-soft: rgba(248, 81, 73, 0.12);
+    --tp-warn-bg: rgba(240, 180, 41, 0.12);
+    --tp-warn-text: #f0b429;
+    --tp-neutral-bg: #1a212b;
+    --tp-neutral-text: #c5ccd6;
+    --tp-focus: #ffffff;
+    --tp-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2398a2b3' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+
+    --tp-hsl-surface: 216 21% 9%;
+    --tp-hsl-text: 216 23% 91%;
+    --tp-hsl-subtle: 215 25% 14%;
+    --tp-hsl-muted: 218 15% 65%;
+    --tp-hsl-border: 217 20% 17%;
+    --tp-hsl-input: 220 22% 47%;
+    --tp-hsl-primary: 212 100% 65%;
+    --tp-hsl-primary-text: 211 66% 8%;
+}
+
+/* ---- Light (Unraid "White") ---- */
+:root.tp-nexus.Theme--white {
+    --tp-bg: #f3f5f8;
+    --tp-elevated: #ffffff;
+    --tp-subtle: #eef1f5;
+    --tp-text: #111827;
+    --tp-muted: #4b5563;
+    --tp-border: #d7dde6;
+    --tp-input-border: #8994a8;
+    --tp-primary: #0a66c2;
+    --tp-primary-ii: #0a66c2;
+    --tp-primary-soft: rgba(10, 102, 194, 0.1);
+    --tp-tab-active: #ffffff;
+    --tp-primary-text: #ffffff;
+    --tp-brand: #d9650b;
+    --tp-header-bg: var(--tp-custom-header-bg, #111827);
+    --tp-header-text: var(--tp-custom-header-text, #ffffff);
+    --tp-header-muted: var(--tp-custom-header-muted, #aab4c3);
+    --tp-shadow-sm: none;
+    --tp-shadow-lg: 0 16px 40px -18px rgba(17, 24, 39, 0.25);
+    --tp-success: #1a7f37;
+    --tp-success-bg: #e2f3e6;
+    --tp-success-text: #1a7f37;
+    --tp-danger: #cf222e;
+    --tp-danger-soft: rgba(207, 34, 46, 0.08);
+    --tp-warn-bg: #fbf1d9;
+    --tp-warn-text: #9a6700;
+    --tp-neutral-bg: #eef1f5;
+    --tp-neutral-text: #374151;
+    --tp-focus: #111827;
+    --tp-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234b5563' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+
+    --tp-hsl-surface: 0 0% 100%;
+    --tp-hsl-text: 221 39% 11%;
+    --tp-hsl-subtle: 214 26% 95%;
+    --tp-hsl-muted: 215 14% 34%;
+    --tp-hsl-border: 216 23% 87%;
+    --tp-hsl-input: 219 15% 60%;
+    --tp-hsl-primary: 210 90% 40%;
+    --tp-hsl-primary-text: 0 0% 100%;
+}
+
+/* ---- Both modes ---- */
+:root.tp-nexus:is(.Theme--black, .Theme--white) {
+    --tp-font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --tp-font-heading: "IBM Plex Sans", system-ui, sans-serif;
+    --tp-font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    --tp-gradient: linear-gradient(var(--tp-primary), var(--tp-primary));
+    --tp-r-sm: 6px;
+    --tp-r-md: 8px;
+}
+
+/* Headings in Plex are set a little tighter and lighter than Space Grotesk was. */
+:root.tp-nexus :is(h1, h2, h3, .tp-page-title) {
+    letter-spacing: -0.005em;
+}
+
+/* Identity: the current menu item is marked in Unraid orange, in the sidebar and the top bar. */
+:root.tp-nexus .nav-tile:not(.right) .nav-item:after {
+    background: var(--tp-brand) !important;
+}
+
+:root.tp-nexus .nav-tile:not(.right) .nav-item.active a:before {
+    color: var(--tp-brand) !important;
+}
+
+/* Group labels (TrueNAS style): small capitals above Dashboard tiles and settings sections. */
+:root.tp-nexus :is(.tile-header .tile-header-left h3, .title > span.left) {
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--tp-muted);
+}
+
+/* Dense tables: data in Plex Mono with aligned digits; warned rows get an amber edge. */
+:root.tp-nexus table {
+    font-variant-numeric: tabular-nums;
+}
+
+:root.tp-nexus :is(code, kbd, samp, pre:not(.up), td.path, .tp-mono) {
+    font-family: var(--tp-font-mono);
+}
+
+:root.tp-nexus :is(table.disk_status, table.unraid) tr:has(.yellow-orb, .orange-text) > td:first-child {
+    box-shadow: inset 3px 0 0 var(--tp-warn-text);
+}
+
+:root.tp-nexus :is(table.disk_status, table.unraid) tr:has(.red-orb, .red-text) > td:first-child {
+    box-shadow: inset 3px 0 0 var(--tp-danger);
+}
+
+/* Focus: accent outline plus a ring in the highest-contrast colour. */
+:root.tp-nexus :focus-visible {
+    outline: 2px solid var(--tp-primary) !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 4px var(--tp-focus) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root.tp-nexus *,
+    :root.tp-nexus *::before,
+    :root.tp-nexus *::after {
+        animation-duration: 0s !important;
+        transition: none !important;
+    }
+}

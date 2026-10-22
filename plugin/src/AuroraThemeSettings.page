@@ -47,10 +47,13 @@ _(Style)_:
 : <select name="style">
   <?=mk_option($aurora['style'] ?? 'aurora', "aurora", _("Aurora (default)"))?>
   <?=mk_option($aurora['style'] ?? 'aurora', "console", _("Console: calm, dense, high contrast"))?>
+  <?=mk_option($aurora['style'] ?? 'aurora', "nexus", _("Nexus: Unraid orange, graphite, IBM Plex"))?>
   </select>
 
 > Console uses flat surfaces, a single blue accent, status colours that pass contrast checks in
-> both modes, a stronger focus ring and no animation. An accent colour set above still applies.
+> both modes, a stronger focus ring and no animation. Nexus combines Unraid's orange for the current
+> menu item with a graphite ground, IBM Plex fonts, small-capital group labels and coloured edges on
+> warned disk rows. An accent colour set above still applies to both.
 
 _(Navigation layout)_:
 : <select name="layout">
