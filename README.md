@@ -34,13 +34,13 @@ A modern theme plugin for the Unraid webGUI: new colours and fonts, an optional 
 In Unraid, go to **Plugins → Install Plugin**, paste this address and click **Install**:
 
 ```
-https://github.com/Tunefish92/Aurora-Theme/releases/latest/download/Aurora-Theme.plg
+https://github.com/ldoctoru/Aurora-Theme/releases/latest/download/Aurora-Theme.plg
 ```
 
 Or over SSH:
 
 ```
-plugin install https://github.com/Tunefish92/Aurora-Theme/releases/latest/download/Aurora-Theme.plg
+plugin install https://github.com/ldoctoru/Aurora-Theme/releases/latest/download/Aurora-Theme.plg
 ```
 
 Requires Unraid 7.2 or newer. The theme follows the Dynamix colour theme in *Settings → Display Settings*: **Black** gives the dark look, **White** the light one; the round button at the top right switches between the two. Other Dynamix themes are left unchanged.

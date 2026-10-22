@@ -45,6 +45,16 @@ function aurora_plg_version(string $file): string
     return $xml && (string) $xml['name'] === AURORA_PLUGIN ? (string) $xml['version'] : '';
 }
 
+/**
+ * Compares two versions such as "2026.10.22.1752" part by part (version_compare), so a
+ * pre-release like "2026.10.22.1752-beta" counts as older than "2026.10.22.1752".
+ * Returns -1, 0 or 1, like strcmp().
+ */
+function aurora_version_cmp(string $a, string $b): int
+{
+    return version_compare($a, $b);
+}
+
 function aurora_installed_version(): string
 {
     return aurora_plg_version('/boot/config/plugins/' . AURORA_PLUGIN . '.plg');

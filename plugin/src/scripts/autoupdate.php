@@ -45,7 +45,7 @@ if (isset($latest['error'])) {
     finish('skipped', $latest['error']);
 }
 $available = $latest['version'];
-if (strcmp($available, $installed) <= 0) {
+if (aurora_version_cmp($available, $installed) <= 0) {
     finish('current', "Up to date ($installed).", $installed);
 }
 

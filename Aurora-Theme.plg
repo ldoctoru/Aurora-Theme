@@ -5,8 +5,8 @@
         author="Tunefish"
         version="2026.10.22.1752"
         launch="Settings/AuroraThemeSettings"
-        pluginURL="https://raw.githubusercontent.com/Tunefish92/Aurora-Theme/release/Aurora-Theme.plg"
-        support="https://github.com/Tunefish92/Aurora-Theme/issues"
+        pluginURL="https://raw.githubusercontent.com/ldoctoru/Aurora-Theme/release/Aurora-Theme.plg"
+        support="https://github.com/ldoctoru/Aurora-Theme/issues"
         icon="paint-brush"
         min="7.2.0">
 
@@ -410,8 +410,8 @@ $auroraAuto = json_decode((string) @file_get_contents('/var/lib/aurora-theme/aut
 // ("Update now", the Plugins page), its outcome ("Up to date (old version)") no longer applies.
 if (!empty($auroraAuto['version']) && (string) $auroraAuto['version'] !== $auroraInstalled) $auroraAuto = [];
 $auroraAutoOn = ($aurora['autoupdate'] ?? 'yes') === 'yes';
-$auroraAutoNewer = ($auroraAuto['result'] ?? '') !== 'updated' && !empty($auroraAuto['version']) && strcmp((string) $auroraAuto['version'], $auroraInstalled) > 0;
-$auroraRepo = 'Tunefish92/Aurora-Theme';
+$auroraAutoNewer = ($auroraAuto['result'] ?? '') !== 'updated' && !empty($auroraAuto['version']) && aurora_version_cmp((string) $auroraAuto['version'], $auroraInstalled) > 0;
+$auroraRepo = 'ldoctoru/Aurora-Theme';
 ?>
 <link type="text/css" rel="stylesheet" href="<?php autov('/plugins/Aurora-Theme/styles/settings.css') ?>">
 <div class="title"><span class="left"><i class="fa fa-cloud-download title"></i>_(Update)_</span></div>
@@ -4763,7 +4763,7 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/include/UpdateLib.php <<'AURORA_THE
 // Used by include/check-update.php ("Check for updates") and scripts/autoupdate.php.
 
 const AURORA_PLUGIN = 'Aurora-Theme';
-const AURORA_REPO = 'Tunefish92/Aurora-Theme';
+const AURORA_REPO = 'ldoctoru/Aurora-Theme';
 const AURORA_RELEASE_API = 'https://api.github.com/repos/' . AURORA_REPO . '/releases/latest';
 const AURORA_RELEASE_PLG = 'https://github.com/' . AURORA_REPO . '/releases/latest/download/' . AURORA_PLUGIN . '.plg';
 const AURORA_RELEASES_PAGE = 'https://github.com/' . AURORA_REPO . '/releases';
@@ -4803,6 +4803,16 @@ function aurora_plg_version(string $file): string
 {
     $xml = is_file($file) ? @simplexml_load_file($file) : false;
     return $xml && (string) $xml['name'] === AURORA_PLUGIN ? (string) $xml['version'] : '';
+}
+
+/**
+ * Compares two versions such as "2026.10.22.1752" part by part (version_compare), so a
+ * pre-release like "2026.10.22.1752-beta" counts as older than "2026.10.22.1752".
+ * Returns -1, 0 or 1, like strcmp().
+ */
+function aurora_version_cmp(string $a, string $b): int
+{
+    return version_compare($a, $b);
 }
 
 function aurora_installed_version(): string
@@ -4877,7 +4887,7 @@ if (isset($latest['error'])) {
     echo json_encode(['installed' => $installed, 'error' => $latest['error']]);
     exit;
 }
-$newer = strcmp($latest['version'], $installed) > 0;
+$newer = aurora_version_cmp($latest['version'], $installed) > 0;
 echo json_encode([
     'installed' => $installed,
     'available' => $latest['version'],
@@ -4886,7 +4896,7 @@ echo json_encode([
     'plg' => $latest['plg'],
     'message' => $newer
         ? "Version {$latest['version']} is available on GitHub (installed: $installed)."
-        : (strcmp($installed, $latest['version']) > 0
+        : (aurora_version_cmp($installed, $latest['version']) > 0
             ? "Installed version $installed is newer than the newest release ({$latest['version']})."
             : "Installed version $installed is the newest release."),
 ]);
@@ -5303,7 +5313,7 @@ if (isset($latest['error'])) {
     finish('skipped', $latest['error']);
 }
 $available = $latest['version'];
-if (strcmp($available, $installed) <= 0) {
+if (aurora_version_cmp($available, $installed) <= 0) {
     finish('current', "Up to date ($installed).", $installed);
 }
 

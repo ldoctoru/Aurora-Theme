@@ -15,7 +15,7 @@ from xml.sax.saxutils import escape
 NAME = "Aurora-Theme"
 AUTHOR = "Tunefish"
 # GitHub repository: updates are checked there and the settings page opens issues there.
-GITHUB_REPO = "Tunefish92/Aurora-Theme"
+GITHUB_REPO = "ldoctoru/Aurora-Theme"
 # Unraid's Plugins page downloads this file on every visit to see whether an update is out. It is
 # the newest release's .plg on the "release" branch, which plugin/release.py updates with each
 # GitHub release and nothing else touches. raw.githubusercontent.com answers in one request

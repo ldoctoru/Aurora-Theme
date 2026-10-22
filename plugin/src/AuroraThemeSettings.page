@@ -113,7 +113,7 @@ $auroraAuto = json_decode((string) @file_get_contents('/var/lib/aurora-theme/aut
 // ("Update now", the Plugins page), its outcome ("Up to date (old version)") no longer applies.
 if (!empty($auroraAuto['version']) && (string) $auroraAuto['version'] !== $auroraInstalled) $auroraAuto = [];
 $auroraAutoOn = ($aurora['autoupdate'] ?? 'yes') === 'yes';
-$auroraAutoNewer = ($auroraAuto['result'] ?? '') !== 'updated' && !empty($auroraAuto['version']) && strcmp((string) $auroraAuto['version'], $auroraInstalled) > 0;
+$auroraAutoNewer = ($auroraAuto['result'] ?? '') !== 'updated' && !empty($auroraAuto['version']) && aurora_version_cmp((string) $auroraAuto['version'], $auroraInstalled) > 0;
 $auroraRepo = '@@GITHUB_REPO@@';
 ?>
 <link type="text/css" rel="stylesheet" href="<?php autov('/plugins/Aurora-Theme/styles/settings.css') ?>">

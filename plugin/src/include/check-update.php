@@ -21,7 +21,7 @@ if (isset($latest['error'])) {
     echo json_encode(['installed' => $installed, 'error' => $latest['error']]);
     exit;
 }
-$newer = strcmp($latest['version'], $installed) > 0;
+$newer = aurora_version_cmp($latest['version'], $installed) > 0;
 echo json_encode([
     'installed' => $installed,
     'available' => $latest['version'],
@@ -30,7 +30,7 @@ echo json_encode([
     'plg' => $latest['plg'],
     'message' => $newer
         ? "Version {$latest['version']} is available on GitHub (installed: $installed)."
-        : (strcmp($installed, $latest['version']) > 0
+        : (aurora_version_cmp($installed, $latest['version']) > 0
             ? "Installed version $installed is newer than the newest release ({$latest['version']})."
             : "Installed version $installed is the newest release."),
 ]);
