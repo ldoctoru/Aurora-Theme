@@ -3,7 +3,7 @@
 
 <PLUGIN name="Aurora-Theme"
         author="Tunefish"
-        version="2026.10.22.2358"
+        version="2026.10.23.0006"
         launch="Settings/AuroraThemeSettings"
         pluginURL="https://raw.githubusercontent.com/ldoctoru/Aurora-Theme/release/Aurora-Theme.plg"
         support="https://github.com/ldoctoru/Aurora-Theme/issues"
@@ -11,7 +11,7 @@
         min="7.2.0">
 
 <CHANGES>
-###2026.10.22.2358
+###2026.10.23.0006
 - New colours, fonts, tables, buttons, dialogs and notification panel for the Black and White themes.
 - Optional sidebar navigation layout.
 - Page enhancements: brand and server card in the sidebar, slim top bar, page headings, status pills, Docker summary and filters.
@@ -6885,6 +6885,7 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
     let ours = null;
     let timer = null;
     let busy = false;
+    let failures = 0;
 
     const apiDelivers = function () {
       const data = chart.customData && chart.customData.cpuData;
@@ -6957,13 +6958,19 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
           return response.json();
         })
         .then(function (sample) {
+          failures = 0;
           if (apiDelivers()) return;
           show(sample);
           previous = sample;
         })
         .catch(function (error) {
-          clearInterval(timer);
-          console.error('Aurora Theme processor figures:', error);
+          // A single failed reading (server busy, network blip) skips one update; only three
+          // in a row stop the polling.
+          failures++;
+          if (failures >= 3) {
+            clearInterval(timer);
+            console.error('Aurora Theme processor figures:', error);
+          }
         })
         .finally(function () { busy = false; });
     }
@@ -10814,12 +10821,12 @@ table.dashboard span.outer.solid .inner {
     height: 0.8rem;
     border: 2px solid var(--tp-elevated, var(--background-color));
     border-radius: 50%;
-    background-color: #22c55e;
+    background-color: var(--tp-success-text, #22c55e);
     content: "";
 }
 
 .tp-app-icon.tp-app-paused::after {
-    background-color: #f59e0b;
+    background-color: var(--tp-warn-text, #f59e0b);
 }
 
 /* Stopped: greyed out, without a dot. */
@@ -11268,7 +11275,7 @@ nav.tabs > .tp-segment.tp-title-switch {
 }
 
 .tile-system-memory-charts.tp-rings div.pie[data-level="warning"] > span[class^="sys"] {
-    color: #f59e0b !important;
+    color: var(--tp-warn-text, #f59e0b) !important;
 }
 
 .tile-system-memory-charts.tp-rings div.pie[data-level="critical"] > span[class^="sys"] {
@@ -12201,8 +12208,8 @@ select.tp-select-open {
     content: "";
 }
 
-.tp-ct-running .tp-ct-icon:after { background-color: #22c55e; }
-.tp-ct-paused .tp-ct-icon:after { background-color: #f59e0b; }
+.tp-ct-running .tp-ct-icon:after { background-color: var(--tp-success-text, #22c55e); }
+.tp-ct-paused .tp-ct-icon:after { background-color: var(--tp-warn-text, #f59e0b); }
 
 .tp-ct-text {
     flex: 1 1 auto;
@@ -12690,8 +12697,8 @@ select.tp-select-open {
 }
 
 .tp-ops tr.tp-op-array td.tp-op-state i.green-orb {
-    color: #22c55e;
-    filter: drop-shadow(0 0 5px rgba(34, 197, 94, 0.8));
+    color: var(--tp-success-text, #22c55e);
+    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--tp-success-text, #22c55e) 60%, transparent));
 }
 
 .tp-ops tr.tp-op-array td.tp-op-desc {
@@ -13004,8 +13011,8 @@ select.tp-select-open {
 
 .tp-port-ok > .tp-port-mark {
     color: #ffffff;
-    background-color: #22c55e;
-    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.18);
+    background-color: #15803d;
+    box-shadow: 0 0 0 4px rgba(21, 128, 61, 0.2);
 }
 
 .tp-port-ok > .tp-port-mark:before {
@@ -13167,6 +13174,10 @@ select.tp-select-open {
     color: #2dd4bf;
     background-color: rgba(45, 212, 191, 0.14);
 }
+
+/* Light theme: the violet and teal above are too pale to read on white. */
+:root.Theme--white .tp-alloc-pill.tp-net-host { color: #6d28d9; }
+:root.Theme--white .tp-alloc-pill.tp-net-custom { color: #0f766e; }
 
 .tp-alloc-ip {
     color: var(--tp-text, var(--text-color));
@@ -13391,7 +13402,7 @@ select.tp-select-open {
 }
 
 .tp-cpu-chip > i.fa-thermometer-half {
-    color: #f59e0b;
+    color: var(--tp-warn-text, #f59e0b);
 }
 
 /* Package lines: "CPU 0" with its chips; hidden when nothing is known. */
@@ -18815,6 +18826,7 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/styles/theme.css <<'AURORA_THEME_EO
     #guiSearchBox:focus {
         border-color: var(--tp-primary);
         outline: none;
+        box-shadow: 0 0 0 3px var(--tp-primary-soft);
     }
 
     /* System Information (the Info button): Unraid puts its table in a <pre>, so long values
@@ -21065,7 +21077,7 @@ cat > /boot/config/plugins/Aurora-Theme/stats.cron <<'AURORA_THEME_EOF'
 AURORA_THEME_EOF
 /usr/bin/php /usr/local/emhttp/plugins/Aurora-Theme/scripts/schedule.php
 echo ""
-echo "Aurora-Theme 2026.10.22.2358 is installed."
+echo "Aurora-Theme 2026.10.23.0006 is installed."
 echo "Settings: Settings > User Utilities > Aurora Theme"
 echo ""
 ]]>
