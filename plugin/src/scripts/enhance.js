@@ -1617,6 +1617,111 @@
     })();
   }
 
+  // Top bar, every page: how many problems the health check finds (red and amber), as a pill
+  // that opens the Dashboard and its health strip. Hidden when there are none.
+  function alertPill() {
+    if (!window.auroraHealth) return;
+    const crumb = document.querySelector('#header .tp-crumb');
+    if (!crumb || crumb.querySelector('.tp-alert-pill')) return;
+    const pill = element('a', 'tp-alert-pill');
+    pill.href = '/Dashboard';
+    pill.hidden = true;
+    crumb.append(pill);
+    let failures = 0;
+    let timer = null;
+    function load() {
+      if (document.hidden) return;
+      fetch(PLUGIN_BASE + '/include/health.php?counts', { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (response) {
+          if (!response.ok) throw new Error('health counts failed with status ' + response.status);
+          return response.json();
+        })
+        .then(function (data) {
+          failures = 0;
+          const danger = Number((data.counts || {}).danger) || 0;
+          const warn = Number((data.counts || {}).warn) || 0;
+          const total = danger + warn;
+          pill.hidden = total === 0;
+          pill.className = 'tp-alert-pill ' + (danger ? 'tp-alert-danger' : 'tp-alert-warn');
+          pill.textContent = total + (total === 1 ? ' problem' : ' problems');
+          pill.title = 'Open the Dashboard to see ' + (total === 1 ? 'it' : 'them');
+        })
+        .catch(function (error) {
+          failures++;
+          if (failures >= 3) {
+            clearInterval(timer);
+            console.error('Aurora Theme alert count:', error);
+          }
+        });
+    }
+    load();
+    timer = setInterval(load, 120000);
+  }
+
+  // Dashboard: app tiles, one per container, as on Homepage or Homarr: running state, Docker's
+  // status text, an update notice and the WebUI link. Running apps first. From include/apps.php,
+  // refreshed every minute while the page is visible.
+  function dashboardApps() {
+    if (!window.auroraAppTiles) return;
+    const grid = document.querySelector('#displaybox div.frame');
+    if (!grid || !document.getElementById('db_box1')) return;
+    const section = element('section', 'tp-apps');
+    section.id = 'tp-dashboard-apps';
+    section.setAttribute('aria-labelledby', 'tp-apps-title');
+    const title = element('h2', 'tp-group-label', 'Apps');
+    title.id = 'tp-apps-title';
+    const list = element('ul', 'tp-apps-grid');
+    section.append(title, list);
+    let failures = 0;
+    let timer = null;
+
+    function tile(app) {
+      const item = element('li', 'tp-app-tile' + (app.running ? ' tp-app-running' : ' tp-app-stopped'));
+      const head = element('div', 'tp-app-head');
+      head.append(element('strong', 'tp-app-name', String(app.name)), element('span', 'tp-app-state', app.running ? 'Running' : 'Stopped'));
+      item.append(head, element('span', 'tp-app-status', String(app.status || '')));
+      const foot = element('div', 'tp-app-foot');
+      foot.append(element('span', 'tp-app-update' + (app.update ? ' tp-app-has-update' : ''), app.update ? 'Update available' : 'Up to date'));
+      const url = String(app.webui || '').replace(/\[IP\]/gi, location.hostname);
+      if (app.running && /^https?:\/\/[^\s"<>]+$/i.test(url)) {
+        const open = element('a', 'tp-app-open', 'Open');
+        open.href = url;
+        open.target = '_blank';
+        open.rel = 'noopener noreferrer';
+        open.setAttribute('aria-label', 'Open ' + app.name);
+        foot.append(open);
+      }
+      item.append(foot);
+      return item;
+    }
+
+    function load() {
+      if (document.hidden) return;
+      fetch(PLUGIN_BASE + '/include/apps.php', { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (response) {
+          if (!response.ok) throw new Error('apps failed with status ' + response.status);
+          return response.json();
+        })
+        .then(function (data) {
+          failures = 0;
+          const apps = Array.isArray(data.apps) ? data.apps : [];
+          if (!apps.length) { section.remove(); return; }
+          list.replaceChildren(...apps.map(tile));
+          if (!section.isConnected) grid.before(section);
+        })
+        .catch(function (error) {
+          failures++;
+          if (failures >= 3) {
+            clearInterval(timer);
+            console.error('Aurora Theme app tiles:', error);
+          }
+        });
+    }
+    load();
+    timer = setInterval(load, 60000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
+  }
+
   // Dashboard load charts are drawn by SmoothieCharts on a canvas, so CSS cannot colour them.
   // Their options are adjusted once: theme colours, a thicker smooth line with a soft fill.
   function dashboardCharts() {
@@ -1650,6 +1755,11 @@
         entry.options.fillStyle = chart.seriesSet.length === 1 ? soft(colour, 0.12) : undefined;
       });
     });
+    // Processor chart: a thin amber line at 80% load, so a sustained high load is easy to spot.
+    // (SmoothieCharts draws horizontal lines solid; it has no dashed style.)
+    if (window.cpuchart && window.cpuchart.options) {
+      window.cpuchart.options.horizontalLines = [{ value: 80, color: soft(token('--tp-warn-text', '#f59e0b'), 0.7), lineWidth: 1 }];
+    }
   }
 
   // Dashboard, processor tile: Unraid fills it from the Unraid API's live feed only, so it shows
@@ -3904,7 +4014,7 @@
 
   function start() {
     const info = pageInfo();
-    [function () { topBar(info); }, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardHealth, dashboardSummary, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
+    [function () { topBar(info); }, alertPill, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardHealth, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
       // One failing enhancer must not stop the others or the page's own scripts.
       try { enhancer(); } catch (error) { console.error('Aurora Theme:', error); }
     });

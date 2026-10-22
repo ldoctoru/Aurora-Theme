@@ -1,10 +1,13 @@
 <?php
 // Server health for the Dashboard's health strip, read from Unraid's own state files.
-//   GET  returns {"items": [{"tone": "danger|warn|info|ok", "title": "...", "detail": "...", "href": "/Main"}, ...]}
+//   GET          returns {"items": [{"tone": "danger|warn|info|ok", "title": "...", "detail": "...", "href": "/Main"}, ...],
+//                         "counts": {"danger": n, "warn": n}}
+//   GET ?counts  only {"counts": ...}, without the Docker check, for the top bar on every page
 // Problems come first (danger, then warn, then info); "ok" items follow so the strip always
 // shows the four most useful facts. Read-only: nothing is changed here.
 header('Content-Type: application/json');
 header('Cache-Control: no-store');
+$countsOnly = isset($_GET['counts']);
 
 $var = (array) @parse_ini_file('/var/local/emhttp/var.ini');
 $disks = (array) @parse_ini_file('/var/local/emhttp/disks.ini', true);
@@ -79,7 +82,7 @@ if ($started && $resync === 0 && $synced > 0) {
 
 // ---- Apps: containers whose image has a newer version ----
 $status = json_decode((string) @file_get_contents('/var/lib/docker/unraid-update-status.json'), true);
-if (is_array($status) && is_executable('/usr/bin/docker')) {
+if (!$countsOnly && is_array($status) && is_executable('/usr/bin/docker')) {
     exec("/usr/bin/docker ps -a --format '{{.Names}}\t{{.Image}}' 2>/dev/null", $lines, $code);
     $updates = [];
     foreach ($code === 0 ? $lines : [] as $line) {
@@ -118,6 +121,13 @@ if ($started && !array_intersect($tones, ['danger']) && $disabled + $missing + $
 }
 if (!$alerts && !$warnings) $add('ok', 'No unread alerts', 'Notifications are clear', '/Tools/Notifications');
 
+$counts = ['danger' => 0, 'warn' => 0];
+foreach ($items as $item) if (isset($counts[$item['tone']])) $counts[$item['tone']]++;
+if ($countsOnly) {
+    echo json_encode(['counts' => $counts]);
+    exit;
+}
+
 $rank = ['danger' => 0, 'warn' => 1, 'info' => 2, 'ok' => 3];
 usort($items, function ($a, $b) use ($rank) { return $rank[$a['tone']] <=> $rank[$b['tone']]; });
-echo json_encode(['items' => array_slice($items, 0, 4)]);
+echo json_encode(['items' => array_slice($items, 0, 4), 'counts' => $counts]);

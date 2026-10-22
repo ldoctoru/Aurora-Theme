@@ -4058,3 +4058,110 @@ tbody.tp-cpu-tile > tr.tp-core-pair .usage-disk {
     letter-spacing: 0.08em;
     text-transform: uppercase;
 }
+
+/* ---- Top bar problem count (alertPill) ---- */
+.tp-alert-pill {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.8rem;
+    padding: 0.2rem 0.9rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    text-decoration: none !important;
+    white-space: nowrap;
+}
+
+.tp-alert-pill[hidden] { display: none; }
+.tp-alert-warn { color: var(--tp-warn-text, #f59e0b) !important; }
+.tp-alert-danger { color: var(--tp-danger, #ef4444) !important; }
+
+/* ---- Dashboard app tiles (dashboardApps) ---- */
+.tp-apps {
+    margin: 0 0 1.4rem;
+}
+
+.tp-apps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.tp-app-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    min-width: 0;
+    margin: 0;
+    padding: 1.2rem 1.4rem;
+    border: 1px solid var(--tp-border, var(--table-border-color));
+    border-radius: var(--tp-r-md, 12px);
+    background-color: var(--tp-elevated, var(--table-background-color));
+}
+
+.tp-app-head,
+.tp-app-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    min-width: 0;
+}
+
+.tp-app-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tp-app-state {
+    flex: none;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+/* Shape as well as colour: a filled dot for running, a ring for stopped. */
+.tp-app-state:before {
+    display: inline-block;
+    width: 0.8rem;
+    height: 0.8rem;
+    margin-right: 0.5rem;
+    border-radius: 50%;
+    content: "";
+    vertical-align: 0.05rem;
+}
+
+.tp-app-running .tp-app-state { color: var(--tp-success-text, #22c55e); }
+.tp-app-running .tp-app-state:before { background-color: currentColor; }
+.tp-app-stopped .tp-app-state { color: var(--tp-muted, var(--alt-text-color)); }
+.tp-app-stopped .tp-app-state:before { box-shadow: inset 0 0 0 2px currentColor; }
+.tp-app-stopped .tp-app-name { color: var(--tp-muted, var(--alt-text-color)); }
+
+.tp-app-status,
+.tp-app-update {
+    overflow: hidden;
+    color: var(--tp-muted, var(--alt-text-color));
+    font-size: 1.2rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Update available: amber with a triangle, so it is not told apart by colour alone. */
+.tp-app-has-update {
+    color: var(--tp-warn-text, #f59e0b);
+    font-weight: 600;
+}
+
+.tp-app-has-update:before {
+    content: "\25B2\00A0";
+}
+
+.tp-app-open {
+    flex: none;
+    font-size: 1.2rem;
+    font-weight: 600;
+}

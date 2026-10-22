@@ -77,7 +77,17 @@ _(Dashboard health strip)_:
   </select>
 
 > A row above the Dashboard tiles with the four most useful facts: failed or hot disks, parity,
-> app updates and unread alerts, problems first. Needs page enhancements.
+> app updates and unread alerts, problems first. Also shows a problem count in the top bar on
+> every page. Needs page enhancements.
+
+_(Dashboard app tiles)_:
+: <select name="apptiles">
+  <?=mk_option($aurora['apptiles'] ?? 'no', "no", _("Hidden"))?>
+  <?=mk_option($aurora['apptiles'] ?? 'no', "yes", _("Shown"))?>
+  </select>
+
+> A tile per container above the Dashboard tiles: running or stopped, how long, whether an update
+> is available, and an Open link to its WebUI. Running apps come first.
 
 _(Dashboard tile groups)_:
 : <select name="dashgroups">
