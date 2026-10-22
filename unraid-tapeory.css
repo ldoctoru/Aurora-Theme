@@ -3776,6 +3776,7 @@
     #guiSearchBox:focus {
         border-color: var(--tp-primary);
         outline: none;
+        box-shadow: 0 0 0 3px var(--tp-primary-soft);
     }
 
     /* System Information (the Info button): Unraid puts its table in a <pre>, so long values

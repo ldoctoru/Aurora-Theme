@@ -1509,6 +1509,7 @@
     let ours = null;
     let timer = null;
     let busy = false;
+    let failures = 0;
 
     const apiDelivers = function () {
       const data = chart.customData && chart.customData.cpuData;
@@ -1581,13 +1582,19 @@
           return response.json();
         })
         .then(function (sample) {
+          failures = 0;
           if (apiDelivers()) return;
           show(sample);
           previous = sample;
         })
         .catch(function (error) {
-          clearInterval(timer);
-          console.error('Aurora Theme processor figures:', error);
+          // A single failed reading (server busy, network blip) skips one update; only three
+          // in a row stop the polling.
+          failures++;
+          if (failures >= 3) {
+            clearInterval(timer);
+            console.error('Aurora Theme processor figures:', error);
+          }
         })
         .finally(function () { busy = false; });
     }
