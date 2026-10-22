@@ -43,8 +43,8 @@
     letter-spacing: 0;
 }
 
-.tp-summary-value.tp-good { color: var(--green-500); }
-.tp-summary-value.tp-warn { color: var(--orange-300); }
+.tp-summary-value.tp-good { color: var(--tp-success-text, var(--green-500)); }
+.tp-summary-value.tp-warn { color: var(--tp-warn-text, var(--orange-300)); }
 .tp-summary-value.tp-accent { color: var(--tp-primary, var(--link-text-color)); }
 
 @media (max-width: 767px) {
@@ -4164,4 +4164,30 @@ tbody.tp-cpu-tile > tr.tp-core-pair .usage-disk {
     flex: none;
     font-size: 1.2rem;
     font-weight: 600;
+}
+
+/* ---- Shares tab (sharesPage) ---- */
+.tp-toolbar[hidden] {
+    display: none !important;
+}
+
+/* Shares whose files are not all on parity-protected disks: an amber edge on the row. */
+#shareslist tr.tp-share-unprotected > td:first-child {
+    box-shadow: inset 3px 0 0 var(--tp-warn-text, #f59e0b);
+}
+
+/* The summary has three cells here, not four. */
+#tp-shares-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 640px) {
+    #tp-shares-summary {
+        grid-template-columns: 1fr;
+    }
+
+    #tp-shares-summary .tp-summary-item + .tp-summary-item {
+        border-left: 0;
+        border-top: 1px solid var(--tp-border, var(--table-border-color));
+    }
 }
