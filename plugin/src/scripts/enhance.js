@@ -52,10 +52,11 @@
   // The first `max` of them are shown and "+n" for the rest; each icon's tooltip is the app's
   // name. An app with a target (the element whose click opens its menu) opens that menu when
   // its icon is clicked. The strip is only rebuilt when the apps or their states change.
-  //   apps: [{ name, src, state: 'running' | 'paused' | 'stopped', target }]
+  //   apps: [{ name, src, state: 'running' | 'paused' | 'stopped', update, target }]
   const STRIP_ORDER = { running: 0, paused: 1, stopped: 2 };
   function appStrip(strip, list, max) {
-    const apps = list.slice().sort(function (a, b) { return STRIP_ORDER[a.state] - STRIP_ORDER[b.state]; });
+    // Apps with an update first, so the limit never hides their dot; then running, paused, stopped.
+    const apps = list.slice().sort(function (a, b) { return (b.update ? 1 : 0) - (a.update ? 1 : 0) || STRIP_ORDER[a.state] - STRIP_ORDER[b.state]; });
     // The targets are replaced on every call: Unraid rebuilds its rows and chips on refresh.
     strip.tpTargets = new Map(apps.map(function (app) { return [app.name, app.target]; }));
     if (!strip.tpBound) {
@@ -63,13 +64,13 @@
       strip.addEventListener('click', openFromStrip);
       strip.addEventListener('keydown', openFromStrip);
     }
-    const signature = apps.map(function (app) { return app.name + ':' + app.state + (app.target ? '' : ':-'); }).join('|');
+    const signature = apps.map(function (app) { return app.name + ':' + app.state + (app.update ? ':u' : '') + (app.target ? '' : ':-'); }).join('|');
     if (strip.dataset.apps === signature) return;
     strip.dataset.apps = signature;
     const shown = apps.slice(0, max).map(function (app) {
-      const item = element('span', 'tp-app-icon tp-app-' + app.state);
+      const item = element('span', 'tp-app-icon tp-app-' + app.state + (app.update ? ' tp-app-update' : ''));
       item.dataset.name = app.name;
-      item.title = app.name + (app.state === 'running' ? '' : ' (' + app.state + ')');
+      item.title = app.name + (app.state === 'running' ? '' : ' (' + app.state + ')') + (app.update ? ', update available' : '');
       if (app.target) {
         item.setAttribute('role', 'button');
         item.tabIndex = 0;
@@ -690,9 +691,11 @@
 
   // Top right: a sun / moon switch between the Black and White Dynamix themes. The choice is a
   // server setting, saved in two places so it holds on every page and in every browser:
-  //   1. dynamix.cfg, through /update.php with the same form Display Settings submits;
+  //   1. dynamix.cfg, through include/theme.php, which changes only the theme key;
   //   2. the Unraid API's own copy (customization.setTheme), when the API is running, because
   //      the API can otherwise write its older value back.
+  // The API rewrites dynamix.cfg itself a moment later, so theme.php is asked once more to check
+  // that nothing went missing in between and to put back anything that did (issue #22).
   // The page reloads once the server has answered. Other Dynamix themes do not show the switch.
   function themeSwitch() {
     const root = document.documentElement;
@@ -706,46 +709,33 @@
     button.setAttribute('aria-label', button.title);
     button.append(element('i', 'fa ' + (dark ? 'fa-moon-o' : 'fa-sun-o')));
 
-    // Saves through a hidden form and frame, exactly like Display Settings.
-    function saveConfig(theme) {
-      return new Promise(function (resolve, reject) {
-        const name = 'tp-theme-frame-' + Date.now();
-        const frame = element('iframe');
-        frame.name = name;
-        frame.hidden = true;
-        const form = element('form');
-        form.method = 'POST';
-        form.action = '/update.php';
-        form.target = name;
-        form.hidden = true;
-        Object.entries({ '#file': 'dynamix/dynamix.cfg', '#section': 'display', theme: theme, csrf_token: window.csrf_token || '' }).forEach(function (pair) {
-          const input = element('input');
-          input.type = 'hidden';
-          input.name = pair[0];
-          input.value = pair[1];
-          form.append(input);
+    // step "save" changes the theme; step "verify" puts back keys lost since "save".
+    function saveConfig(theme, step) {
+      const body = new URLSearchParams({ theme: theme, step: step, csrf_token: window.csrf_token || '' });
+      return fetch(PLUGIN_BASE + '/include/theme.php', { method: 'POST', credentials: 'same-origin', body: body })
+        .then(function (response) {
+          return response.json().catch(function () { return { error: 'unexpected answer from the server, status ' + response.status }; });
+        })
+        .then(function (data) {
+          if (data.error) throw new Error(data.error);
+          if (data.restored) console.warn('Aurora Theme: put back ' + data.restored + ' dynamix.cfg settings lost while the theme changed');
         });
-        const timer = setTimeout(function () { reject(new Error('no answer from /update.php')); }, 15000);
-        frame.addEventListener('load', function () {
-          clearTimeout(timer);
-          let text = '';
-          try { text = frame.contentDocument ? frame.contentDocument.body.textContent : ''; } catch (error) { text = ''; }
-          if (/csrf_token/.test(text)) reject(new Error(text.trim()));
-          else resolve();
-        });
-        document.body.append(frame, form);
-        form.submit();
-      });
     }
 
     // The Unraid API keeps a copy of the theme; it is told too when it is reachable.
     function saveApi(theme) {
-      if (!window.apolloClient || !window.gql) return Promise.resolve();
+      if (!window.apolloClient || !window.gql) return Promise.resolve(false);
       const mutation = window.gql('mutation setTheme($theme: ThemeName!) { customization { setTheme(theme: $theme) { name } } }');
-      const call = window.apolloClient.mutate({ mutation: mutation, variables: { theme: theme } }).catch(function (error) {
+      const call = window.apolloClient.mutate({ mutation: mutation, variables: { theme: theme } }).then(function () { return true; }, function (error) {
         console.warn('Aurora Theme: the Unraid API did not take the theme', error);
+        return true;
       });
-      return Promise.race([call, new Promise(function (resolve) { setTimeout(resolve, 4000); })]);
+      return Promise.race([call, new Promise(function (resolve) { setTimeout(function () { resolve(true); }, 4000); })]);
+    }
+
+    // Gives the API time to write its copy of dynamix.cfg before it is checked.
+    function settle(apiCalled) {
+      return new Promise(function (resolve) { setTimeout(resolve, apiCalled ? 1500 : 0); });
     }
 
     let busy = false;
@@ -758,8 +748,17 @@
       button.classList.toggle('tp-dark', !dark);
       button.classList.add('tp-busy');
       button.setAttribute('aria-busy', 'true');
-      saveConfig(next)
+      saveConfig(next, 'save')
         .then(function () { return saveApi(next); })
+        .then(settle)
+        .then(function () {
+          // The theme is saved by now: a failed check gets its own message, then the page
+          // reloads with the new theme all the same.
+          return saveConfig(next, 'verify').catch(function (error) {
+            console.error('Aurora Theme:', error);
+            return modal({ title: 'Theme changed, settings not confirmed', message: ['The theme was changed, but Aurora could not confirm that your other settings in dynamix.cfg are intact (' + error.message + ').', 'Please check Settings > Display Settings and your notification and parity settings.'], confirmLabel: 'OK', hideCancel: true });
+          });
+        })
         .then(function () { location.reload(); })
         .catch(function (error) {
           console.error('Aurora Theme:', error);
@@ -1174,7 +1173,7 @@
           app: function (item) {
             const image = item.row.querySelector('td.ct-name img.img');
             const trigger = item.row.querySelector('td.ct-name span.hand[id]');
-            return { name: item.name, src: image && image.src, state: item.paused ? 'paused' : item.running ? 'running' : 'stopped', target: trigger };
+            return { name: item.name, src: image && image.src, state: item.paused ? 'paused' : item.running ? 'running' : 'stopped', update: item.update, target: trigger };
           },
         });
         const load = sectionLoad(section.items);
@@ -1295,10 +1294,12 @@
       const rows = [...list.querySelectorAll('td.ct-name:not(.folder-name)')].map(function (cell) { return describe(cell.parentElement); });
       if (!rows.length) return;
       formatCpu(rows);
-      // Long names end in "…" (enhance.css); the whole name is the tooltip.
+      // Long names end in "…" (enhance.css); the whole name is the tooltip. A container with
+      // an update gets the orange dot on its icon.
       rows.forEach(function (item) {
         const name = item.row.querySelector('td.ct-name .appname');
         if (name && name.title !== item.name) name.title = item.name;
+        item.row.classList.toggle('tp-update', item.update);
       });
       if (folderView) {
         arrangeFolders();
@@ -1893,6 +1894,27 @@
     }, 4000);
   }
 
+  // Dashboard, Docker tile: an orange dot on the icon of every container with an update ready,
+  // running or not (issue #24). Unraid redraws the tile's chips on each refresh.
+  function dashboardUpdates() {
+    const view = document.getElementById('docker_view');
+    if (!view) return;
+    const mark = function () {
+      view.querySelectorAll('span.outer.apps').forEach(function (chip) {
+        const update = chipUpdate(chip);
+        if (chip.classList.contains('tp-update') !== update) chip.classList.toggle('tp-update', update);
+        // The tooltip is only taken away again if it is ours.
+        const hand = chip.querySelector(':scope > span.hand');
+        if (hand && update && !hand.title) hand.title = 'Update available';
+        else if (hand && !update && hand.title === 'Update available') hand.removeAttribute('title');
+      });
+    };
+    // Not debounced: marked before the next paint, so a stopped container with an update that
+    // Unraid has just hidden (enhance.css shows it again) does not flicker.
+    mark();
+    new MutationObserver(mark).observe(view, { childList: true, subtree: true });
+  }
+
   // Dashboard, Docker tile: a click on a container opens a dialog with its state and everything
   // Unraid's small context menu offers, as large buttons. The buttons call Unraid's own functions.
   function dashboardContainers() {
@@ -2307,13 +2329,20 @@
     return inner && inner.firstChild ? inner.firstChild.textContent.trim() : '';
   }
 
+  // Whether a Dashboard container chip has an image update ready (the "update" argument of its
+  // icon's addDockerContainerContext call is 1). VM chips have none.
+  function chipUpdate(chip) {
+    const trigger = chip.querySelector(':scope > span.hand[onclick*="addDockerContainerContext"]');
+    return Boolean(trigger) && contextArguments(trigger)[5] === '1';
+  }
+
   // Dashboard chips as apps for an icon strip; a click on an icon is a click on the chip's icon.
   function chipApps(chips) {
     return chips.map(function (chip) {
       const hand = chip.querySelector(':scope > span.hand');
       const image = hand && hand.querySelector('img');
       const state = chip.classList.contains('paused') ? 'paused' : chip.classList.contains('started') ? 'running' : 'stopped';
-      return { name: chipName(chip), src: image && image.src, state: state, target: hand };
+      return { name: chipName(chip), src: image && image.src, state: state, update: chipUpdate(chip), target: hand };
     });
   }
 
@@ -4036,7 +4065,7 @@
 
   function start() {
     const info = pageInfo();
-    [function () { topBar(info); }, alertPill, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, sharesPage, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
+    [function () { topBar(info); }, alertPill, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, sharesPage, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardUpdates, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
       // One failing enhancer must not stop the others or the page's own scripts.
       try { enhancer(); } catch (error) { console.error('Aurora Theme:', error); }
     });
