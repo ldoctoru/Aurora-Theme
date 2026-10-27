@@ -14,6 +14,10 @@ if (($aurora['style'] ?? 'aurora') == 'console') $auroraClasses[] = 'tp-console'
 if (($aurora['style'] ?? 'aurora') == 'nexus') $auroraClasses[] = 'tp-nexus';
 // Display Settings, "Favorites enabled" set to No also turns off the theme's starred cards.
 if (($display['favorites'] ?? 'yes') == 'no') $auroraClasses[] = 'tp-no-favourites';
+// The page, from the first part of the address ("/Apps/..." gives tp-on-apps), so rules that
+// only matter on one page can be limited to it; the browser then skips them everywhere else.
+$auroraPage = strtolower(preg_replace('/[^A-Za-z0-9-]/', '', explode('/', trim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH), '/'))[0]));
+if ($auroraPage !== '') $auroraClasses[] = 'tp-on-' . $auroraPage;
 
 // Emergency switch: opening any page with ?aurora=off stops the plugin from loading anything
 // in this browser (remembered in a cookie) until a page is opened with ?aurora=on.
@@ -175,6 +179,14 @@ try {
 <script>window.auroraHealth = <?= ($aurora['health'] ?? 'yes') == 'yes' ? 'true' : 'false' ?>; window.auroraDashboardGroups = <?= ($aurora['dashgroups'] ?? 'no') == 'yes' ? 'true' : 'false' ?>; window.auroraAppTiles = <?= ($aurora['apptiles'] ?? 'no') == 'yes' ? 'true' : 'false' ?>;</script>
 <script defer src="<?php autov('/plugins/Aurora-Theme/scripts/enhance.js') ?>"></script>
 <?php
+// Plugins page: FolderView Plus beside FolderView3 or FolderView2 is not supported. The warning
+// of the Docker and VMs tabs (folderViewBeta() in enhance.js) shows here too, where it is fixed.
+if (rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH), '/') === '/Plugins' && is_dir('/usr/local/emhttp/plugins/folderview.plus')
+    && (is_dir('/usr/local/emhttp/plugins/folder.view3') || is_dir('/usr/local/emhttp/plugins/folder.view2'))):
+?>
+<script>window.auroraFolderViewConflict = <?= json_encode(is_dir('/usr/local/emhttp/plugins/folder.view3') ? 'FolderView3' : 'FolderView2') ?>;</script>
+<?php endif; ?>
+<?php
 // Docker and VMs tabs and Dashboard: the saved groups go straight into the page, so the
 // containers and VMs can be shown grouped right away instead of waiting for a separate request.
 if (in_array(rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH), '/'), ['/Docker', '/VMs', '/Dashboard'], true)):
@@ -194,22 +206,39 @@ if (in_array(rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PAT
     // loadlist_original, and as soon as it does, they are put back (after its script has run,
     // before Unraid draws the list). FolderView's own "hide the list until the folders are
     // built" is lifted at once.
-    $auroraFolderView = is_dir('/usr/local/emhttp/plugins/folder.view3') || is_dir('/usr/local/emhttp/plugins/folder.view2') || is_dir('/usr/local/emhttp/plugins/folder.view');
-    $auroraDockerView = ($aurora['dockerview'] ?? 'folderview') === 'aurora' ? 'aurora' : 'folderview';
+    // FolderView Plus (folderview.plus, issue #23) asks themes to leave its lists to it, without
+    // replacing listview / loadlist: with it there is no switch, its folders always draw the
+    // Docker and VMs tabs and the Dashboard, and the theme keeps to colours and layout
+    // (tp-fvplus). See its docs/THEME_API_CONTRACT.md, "Layout Ownership for Theme Integrations".
+    // Plus does not run beside FolderView3 or FolderView2 (it shows a conflict notice instead),
+    // so then the older plugin draws the lists and is treated as such.
+    $auroraFolderViewPlus = is_dir('/usr/local/emhttp/plugins/folderview.plus') && !is_dir('/usr/local/emhttp/plugins/folder.view3') && !is_dir('/usr/local/emhttp/plugins/folder.view2');
+    $auroraFolderView = $auroraFolderViewPlus || is_dir('/usr/local/emhttp/plugins/folder.view3') || is_dir('/usr/local/emhttp/plugins/folder.view2') || is_dir('/usr/local/emhttp/plugins/folder.view');
+    $auroraDockerView = !$auroraFolderViewPlus && ($aurora['dockerview'] ?? 'folderview') === 'aurora' ? 'aurora' : 'folderview';
+    if ($auroraFolderViewPlus) $auroraClasses[] = 'tp-fvplus';
+    // The plugin that draws the folders, by name, for the beta notice on the Docker and VMs tabs.
+    $auroraFolderViewName = $auroraFolderViewPlus ? 'FolderView Plus' : (is_dir('/usr/local/emhttp/plugins/folder.view3') ? 'FolderView3' : (is_dir('/usr/local/emhttp/plugins/folder.view2') ? 'FolderView2' : 'FolderView'));
+    // FolderView Plus beside FolderView3 or FolderView2 is not supported (Plus pauses its folders,
+    // "safe mode", and asks to remove the other one): a warning instead of the beta notice.
+    $auroraFolderViewBoth = is_dir('/usr/local/emhttp/plugins/folderview.plus') && !$auroraFolderViewPlus;
 ?>
 <?php if ($auroraFolderView): ?>
-<script>window.auroraDockerView = { folderView: true, mode: <?= json_encode($auroraDockerView) ?> };</script>
+<script>window.auroraDockerView = { folderView: true, plus: <?= $auroraFolderViewPlus ? 'true' : 'false' ?>, mode: <?= json_encode($auroraDockerView) ?>, name: <?= json_encode($auroraFolderViewName) ?>, both: <?= $auroraFolderViewBoth ? 'true' : 'false' ?> };</script>
 <?php if ($auroraDockerView === 'aurora'): ?>
 <script>
 (function () {
   document.documentElement.classList.add('tp-aurora-view', 'fv3-docker-ready', 'fv3-vm-ready');
   // On the Dashboard FolderView builds its folders from a jQuery prefilter on the tile's data
-  // request (DashboardApps.php); that one prefilter is not registered.
+  // request (DashboardApps.php); that one prefilter is not registered. Nor is the one on the
+  // list order Unraid saves (UserPrefs.php): it renumbers the folders' places and copies the
+  // order into FolderView3's own snapshot (update_order.php), which FolderView3 later uses to
+  // put its folders back in place. Saved from this view, without folders, the snapshot lost
+  // them, and after switching back every folder stood at the top of the list.
   if (window.jQuery && typeof jQuery.ajaxPrefilter === 'function') {
     var addPrefilter = jQuery.ajaxPrefilter;
     jQuery.ajaxPrefilter = function (types, handler) {
       var fn = typeof types === 'function' ? types : handler;
-      if (typeof fn === 'function' && /createFolders/.test(String(fn))) return;
+      if (typeof fn === 'function' && /createFolders|update_order\.php/.test(String(fn))) return;
       return addPrefilter.apply(this, arguments);
     };
   }
@@ -254,10 +283,65 @@ if (in_array(rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PAT
 <?php if ($auroraClasses): ?>
 <script>document.documentElement.classList.add(...<?= json_encode($auroraClasses) ?>);</script>
 <?php endif; ?>
+<?php if (substr('@@VERSION@@', -4) === '-dev'): ?>
+<?php // A dev build (version "...-dev", set by plugin/build.py) is installed: a "Dev" badge in the
+      // top bar, linking to the settings, where the update channel goes back to stable. ?>
+<style id="aurora-dev-badge">
+#header .tp-dev-badge { position: relative; display: inline-flex; align-items: center; gap: 0.5rem; flex: none; align-self: center; margin: 0 0.8rem; padding: 0.35rem 1rem 0.35rem 0.8rem; border: 1px solid transparent; border-radius: 999px; background: linear-gradient(var(--tp-header-bg, #111), var(--tp-header-bg, #111)) padding-box, var(--tp-gradient, linear-gradient(120deg, #3b82f6, #22d3ee)) border-box; color: var(--tp-header-text, inherit); font: 600 1.15rem/1.2 var(--tp-font-heading, inherit); letter-spacing: 0.02em; text-decoration: none; white-space: nowrap; box-shadow: 0 0 0.9rem -0.2rem color-mix(in srgb, var(--tp-primary, #3b82f6) 55%, transparent); }
+#header .tp-dev-badge b { font-weight: 700; background: var(--tp-gradient, linear-gradient(120deg, #3b82f6, #22d3ee)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+#header .tp-dev-badge i { width: 0.7rem; height: 0.7rem; border-radius: 50%; background: var(--tp-primary, #3b82f6); box-shadow: 0 0 0 0 color-mix(in srgb, var(--tp-primary, #3b82f6) 60%, transparent); animation: tp-dev-pulse 2.4s ease-out infinite; }
+#header .tp-dev-badge:hover { box-shadow: 0 0 1.2rem -0.1rem color-mix(in srgb, var(--tp-primary, #3b82f6) 75%, transparent); }
+@keyframes tp-dev-pulse { 70% { box-shadow: 0 0 0 0.6rem transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+#UserProfile > .tp-dev-badge { margin: 0 0.2rem 0 0; }
+#header .tp-dev-badge.tp-dev-in-sidebar { margin: 0 0 0 0.8rem; padding: 0.2rem 0.9rem 0.2rem 0.7rem; font-size: 1.1rem; }
+@media (prefers-reduced-motion: reduce) { #header .tp-dev-badge i { animation: none; } }
+@media (max-width: 767px) { #header .tp-dev-badge { margin: 0 0.4rem; padding: 0.3rem 0.7rem 0.3rem 0.6rem; font-size: 1.05rem; } #header .tp-dev-badge span { display: none; } }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var header = document.getElementById('header');
+  if (!header || header.querySelector('.tp-dev-badge')) return;
+  var badge = document.createElement('a');
+  badge.className = 'tp-dev-badge';
+  badge.href = '/Settings/AuroraThemeSettings';
+  badge.title = 'Aurora Theme dev build @@VERSION@@: a test version, installed because the update channel is set to dev builds. Click to change it.';
+  badge.innerHTML = '<i aria-hidden="true"></i><span>Aurora</span><b>Dev</b>';
+  // Where it goes: with the sidebar shown, beside Unraid's version under the logo; otherwise in
+  // the row at the top right, before the dark / light switch (enhance.js adds it once Unraid's
+  // profile has rendered). That row lies over the rest of the top bar, so anything placed under
+  // it would be hidden, and in the sidebar layout the breadcrumb leaves no room for it. Without
+  // the switch: right after Unraid's version. Placed again when the layout or the sidebar changes.
+  var root = document.documentElement;
+  var place = function () {
+    var version = header.querySelector('unraid-header-os-version');
+    var sidebar = root.classList.contains('tp-sidebar') && !root.classList.contains('tp-topbar') && !root.classList.contains('tp-sidebar-collapsed');
+    var row = sidebar && version && version.querySelector(':scope > div > div');
+    var toggle = header.querySelector('#UserProfile > .tp-theme-switch');
+    badge.classList.toggle('tp-dev-in-sidebar', !!row);
+    if (row) { if (badge.parentNode !== row) row.append(badge); }
+    else if (toggle) { if (badge.nextSibling !== toggle) toggle.before(badge); }
+    else if (version) { if (badge.previousSibling !== version) version.after(badge); }
+    else if (!badge.parentNode) header.prepend(badge);
+  };
+  place();
+  // Unraid's header parts render after this, and the sidebar can be hidden at any time.
+  var watch = new MutationObserver(place);
+  watch.observe(header, { childList: true, subtree: true });
+  setTimeout(function () { watch.disconnect(); }, 15000);
+  new MutationObserver(place).observe(root, { attributes: true, attributeFilter: ['class'] });
+});
+</script>
+<?php endif; ?>
 <?php if (in_array('tp-no-favourites', $auroraClasses)): ?>
 <?php // Unraid shows its Favorites tab whenever /boot/config/favorites.cfg holds pages, even
       // with favourites switched off (issue #25); the theme hides it then. ?>
 <style>#menu .nav-item:has(> a[href="/Favorites"]) { display: none !important; }</style>
+<?php endif; ?>
+<?php if (is_file("$auroraCustomDir/updated.json")): ?>
+<?php // After an update (the install script leaves updated.json): the "Aurora Theme updated"
+      // dialog, once. Nothing is loaded for it otherwise. ?>
+<link type="text/css" rel="stylesheet" href="<?php autov('/plugins/Aurora-Theme/styles/updated.css') ?>">
+<script defer src="<?php autov('/plugins/Aurora-Theme/scripts/updated.js') ?>"></script>
 <?php endif; ?>
 <?php if (is_file("$auroraCustomDir/custom.css")): ?>
 <style id="aurora-custom-css">

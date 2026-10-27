@@ -43,8 +43,17 @@
   // then keeps FolderView out of the list).
   function folderViewActive() {
     const view = window.auroraDockerView;
+    if (folderViewPlus()) return true;
     if (view && view.mode === 'aurora') return false;
     return Boolean(document.querySelector('script[src*="/folder.view"]'));
+  }
+
+  // FolderView Plus (folderview.plus) owns its lists outright: the theme leaves its folders, rows
+  // and chips alone (no view switch, no clicks taken over, nothing moved or rewritten) and keeps
+  // to colours and layout. AuroraTheme.page tells when it is installed; its scripts tell too.
+  function folderViewPlus() {
+    const view = window.auroraDockerView;
+    return Boolean((view && view.plus) || document.querySelector('script[src*="/plugins/folderview.plus/"]'));
   }
 
   // A group's apps (containers or VMs) as small icons: running and paused ones first with a
@@ -275,7 +284,8 @@
   // members' icons, and buttons to start or stop the whole section, move the group up or down,
   // rename or delete it (the last four not for "Ungrouped"). The row's tpItems are the section's
   // members ({ name, running, paused }), set by the tab on every refresh.
-  //   options: { noun ('container' / 'VM'), onToggle(), start(stopped items), stop(running items), load }
+  //   options: { noun ('container' / 'VM'), onToggle(), start(stopped items), stop(running items), load,
+  //              removeAll(items): a "Remove all" button instead of start and stop (Docker's orphan images) }
   function sectionHeader(store, group, options) {
     const row = element('tr', 'tp-group');
     const cell = element('td');
@@ -303,21 +313,30 @@
     const actions = element('div', 'tp-actions');
     const members = function () { return row.tpItems || []; };
     const plural = options.noun + 's';
-    actions.append(iconButton('play', 'Start all stopped ' + plural + ' in this section', function () {
-      options.start(members().filter(function (item) { return !item.running && !item.paused; }));
-    }));
-    actions.append(iconButton('stop', 'Stop all running ' + plural + ' in this section', function () {
-      const running = members().filter(function (item) { return item.running; });
-      if (!running.length) return;
-      modal({
-        title: 'Stop ' + running.length + ' ' + (running.length === 1 ? options.noun : plural) + '?',
-        message: 'All running ' + plural + ' in this section will be stopped: ' + running.map(function (item) { return item.name; }).join(', ') + '.',
-        confirmLabel: 'Stop',
-        danger: true,
-      }).then(function (confirmed) {
-        if (confirmed) options.stop(running);
-      });
-    }, 'tp-danger'));
+    if (options.removeAll) {
+      const remove = element('button', 'tp-group-remove-all');
+      remove.type = 'button';
+      remove.title = 'Remove all ' + plural + ' in this section';
+      remove.append(element('i', 'fa fa-trash'), element('span', '', 'Remove all'));
+      remove.addEventListener('click', function () { if (members().length) options.removeAll(members()); });
+      actions.append(remove);
+    } else {
+      actions.append(iconButton('play', 'Start all stopped ' + plural + ' in this section', function () {
+        options.start(members().filter(function (item) { return !item.running && !item.paused; }));
+      }));
+      actions.append(iconButton('stop', 'Stop all running ' + plural + ' in this section', function () {
+        const running = members().filter(function (item) { return item.running; });
+        if (!running.length) return;
+        modal({
+          title: 'Stop ' + running.length + ' ' + (running.length === 1 ? options.noun : plural) + '?',
+          message: 'All running ' + plural + ' in this section will be stopped: ' + running.map(function (item) { return item.name; }).join(', ') + '.',
+          confirmLabel: 'Stop',
+          danger: true,
+        }).then(function (confirmed) {
+          if (confirmed) options.stop(running);
+        });
+      }, 'tp-danger'));
+    }
     if (group) {
       row.tpUp = iconButton('arrow-up', 'Move group up', function () { store.move(group, -1); }, 'tp-group-move');
       row.tpDown = iconButton('arrow-down', 'Move group down', function () { store.move(group, 1); }, 'tp-group-move');
@@ -425,7 +444,7 @@
     setText(header.querySelector('.tp-group-name'), section.title);
     const toggle = header.querySelector('.tp-group-toggle');
     if (toggle.title !== section.title) toggle.title = section.title;
-    setText(header.querySelector('.tp-group-count'), section.items.length + ' ' + (section.items.length === 1 ? options.noun : options.noun + 's') + ' · ' + running + ' running');
+    setText(header.querySelector('.tp-group-count'), section.items.length + ' ' + (section.items.length === 1 ? options.noun : options.noun + 's') + (options.noRunning ? '' : ' · ' + running + ' running'));
     appStrip(header.querySelector('.tp-group-apps'), section.items.map(options.app), 8);
     header.classList.toggle('tp-collapsed', section.collapsed);
     header.querySelector('.tp-group-toggle').setAttribute('aria-expanded', String(!section.collapsed));
@@ -816,6 +835,64 @@
     box.prepend(heading);
   }
 
+  // Docker and VMs tabs with a folder plugin (FolderView3, FolderView Plus): a "beta" chip in the
+  // top bar (next to the page heading where the top bar has no breadcrumb: top layout, narrow
+  // windows). A click explains that their support is not finished yet.
+  // With FolderView Plus and FolderView3 (or FolderView2) installed together, a warning instead,
+  // also on the Dashboard and the Plugins page: Plus does not support it (it pauses its folders,
+  // "safe mode", and asks to remove the other plugin), and Aurora then follows FolderView3.
+  function folderViewBeta(info) {
+    const view = window.auroraDockerView || (window.auroraFolderViewConflict ? { folderView: true, both: true, name: window.auroraFolderViewConflict } : null);
+    if (!(view && view.folderView) || info.subPage) return;
+    const both = Boolean(view.both);
+    if (!(both ? ['Docker', 'VMs', 'Dashboard', 'Plugins'] : ['Docker', 'VMs']).includes(info.tab)) return;
+    const name = view.name || 'FolderView';
+    const chip = function () {
+      const button = element('button', 'tp-fv-beta' + (both ? ' tp-fv-conflict' : ''));
+      button.type = 'button';
+      // The plugin's name with "support" (left out in a narrow top bar) and a small tag.
+      const text = element('span', 'tp-fv-beta-text', both ? name + ' + Plus' : name);
+      if (!both) text.append(element('span', 'tp-fv-beta-word', ' support'));
+      if (both) {
+        button.title = name + ' and FolderView Plus are both installed. This is not supported. Click for details.';
+        button.append(element('i', 'fa fa-exclamation-triangle'), text, element('span', 'tp-fv-beta-tag', 'Not supported'));
+      } else {
+        button.title = name + ' support is in beta and still has compatibility issues. Click for details.';
+        button.append(element('i', 'fa fa-info-circle'), text, element('span', 'tp-fv-beta-tag', 'Beta'));
+      }
+      button.addEventListener('click', function () {
+        if (both) {
+          modal({
+            title: name + ' and FolderView Plus are both installed',
+            message: [
+              'Running both folder plugins at the same time is not supported. FolderView Plus says so itself: while ' + name + ' is installed it pauses its own folders ("safe mode") and asks to remove the other plugin.',
+              'Aurora then follows ' + name + '. Keep the one you want to use and remove the other under Plugins.',
+            ],
+            confirmLabel: 'Open Plugins',
+            cancelLabel: 'Close',
+          }).then(function (open) {
+            if (open) location.href = '/Plugins';
+          });
+          return;
+        }
+        modal({
+          title: name + ' support is in beta',
+          message: [
+            'Aurora works with FolderView3 and FolderView Plus, but their support is still in beta: some pages and settings can still show compatibility issues.',
+            'I am working on full support. If something looks wrong, please report it on GitHub (Settings > User Utilities > Aurora Theme has a form for it).',
+          ],
+          confirmLabel: 'OK',
+          hideCancel: true,
+        });
+      });
+      return button;
+    };
+    const crumb = document.querySelector('#header .tp-crumb');
+    if (crumb && !crumb.querySelector('.tp-fv-beta')) crumb.append(chip());
+    const heading = document.querySelector('#displaybox .tp-heading-text');
+    if (heading && !heading.querySelector('.tp-fv-beta')) heading.append(chip());
+  }
+
   function summaryStrip(id, label, items) {
     let strip = document.getElementById(id);
     if (!strip) {
@@ -823,6 +900,11 @@
       strip.id = id;
       strip.setAttribute('aria-label', label);
     }
+    // Only redrawn when a value changed: the callers run on every change of the lists and
+    // tiles, and other scripts watching the page (FolderView Plus) react to each redraw.
+    const signature = JSON.stringify(items);
+    if (strip.tpSignature === signature) return strip;
+    strip.tpSignature = signature;
     strip.replaceChildren(...items.map(function (item) {
       const cell = element('div', 'tp-summary-item');
       const value = element('div', 'tp-summary-value' + (item.tone ? ' tp-' + item.tone : ''));
@@ -839,7 +921,7 @@
   // FolderView's folders, for the Docker and VMs tabs alike. Stored on the server for every
   // browser (include/docker-view.php); the page reloads to apply it. Null without FolderView.
   function folderViewSwitch() {
-    if (!(window.auroraDockerView && window.auroraDockerView.folderView && PLUGIN_BASE)) return null;
+    if (!(window.auroraDockerView && window.auroraDockerView.folderView && PLUGIN_BASE) || folderViewPlus()) return null;
     const viewSwitch = element('div', 'tp-segment tp-view-switch');
     viewSwitch.setAttribute('role', 'group');
     viewSwitch.setAttribute('aria-label', 'List view');
@@ -913,6 +995,10 @@
     const table = document.getElementById('docker_containers');
     const list = document.getElementById('docker_list');
     if (!table || !list) return;
+    // FolderView Plus has the Docker tab to itself, toolbar and counts included. It also watches
+    // the whole page, so even the theme's summary above the table, redrawn on each change of the
+    // list, kept it busy (the tab hung). The tab is left alone entirely.
+    if (folderViewPlus()) return;
     const anchor = table.closest('.TableContainer') || table;
     const filters = [['all', 'All'], ['running', 'Running'], ['stopped', 'Stopped'], ['updates', 'Updates']];
     let activeFilter = 'all';
@@ -976,6 +1062,28 @@
       } else {
         webuiCell.append(element('span', 'tp-webui-none', '—'));
       }
+
+      // Phones show the addresses and mounts under the card (enhance.css), without an empty line
+      // for a container that has none. Long paths may break after a "/" only, not inside a
+      // folder name.
+      row.querySelectorAll('td.tp-c-ports, td.tp-c-volumes').forEach(function (cell) {
+        cell.classList.toggle('tp-c-empty', !cell.textContent.trim());
+      });
+      row.querySelectorAll('td.tp-c-volumes .docker_readmore').forEach(function (box) {
+        const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+        const texts = [];
+        while (walker.nextNode()) texts.push(walker.currentNode);
+        texts.forEach(function (node) {
+          const parts = node.nodeValue.split(/(?<=\/)(?=.)/);
+          if (parts.length < 2) return;
+          const pieces = [];
+          parts.forEach(function (part, index) {
+            if (index) pieces.push(document.createElement('wbr'));
+            pieces.push(document.createTextNode(part));
+          });
+          node.replaceWith(...pieces);
+        });
+      });
 
       const statusCell = element('td', 'tp-extra tp-c-status');
       statusCell.append(element('span', 'tp-pill' + (running ? ' tp-good' : paused ? ' tp-warn' : ''), state ? state.textContent.trim() : ''));
@@ -1098,19 +1206,23 @@
     // containers in Unraid's order. Changing the groups saves Unraid's order as the list now
     // shows it, so the containers start in the order they are listed.
     const UNGROUPED = '\u0000ungrouped';
+    // Unraid lists images no container uses as "(orphan image)" rows after the containers; the
+    // Aurora view collects them in an "Orphans" section at the end, with a button removing all.
+    const ORPHANS = '\u0000orphans';
     const collapsed = collapsedState('tft-docker-collapsed');
     const groupRows = new Map();
     const store = groupStore('docker', render, function () { if (!folderView) saveUnraidOrder('docker', list); });
 
-    // Starts or stops several containers one after another, then lets Unraid reload the list once.
-    function runAll(action, ids) {
+    // Starts or stops several containers (or removes images, with key "image") one after
+    // another, then lets Unraid reload the list once.
+    function runAll(action, ids, key) {
       const jq = window.jQuery;
       if (!jq || !window.eventURL || !ids.length) return;
       jq('div.spinner.fixed').show('slow');
       let chain = Promise.resolve();
       ids.forEach(function (id) {
         chain = chain.then(function () {
-          return new Promise(function (resolve) { jq.post(window.eventURL, { action: action, container: id }).always(resolve); });
+          return new Promise(function (resolve) { jq.post(window.eventURL, { action: action, [key || 'container']: id }).always(resolve); });
         });
       });
       chain.then(function () {
@@ -1121,18 +1233,56 @@
 
     function groupRow(key, group) {
       if (groupRows.has(key)) return groupRows.get(key);
-      const row = sectionHeader(store, group, {
+      const onToggle = function () {
+        collapsed.toggle(key);
+        render();
+      };
+      const row = key === ORPHANS ? sectionHeader(store, null, {
+        noun: 'orphan image',
+        onToggle: onToggle,
+        removeAll: removeImages,
+      }) : sectionHeader(store, group, {
         noun: 'container',
         load: true,
-        onToggle: function () {
-          collapsed.toggle(key);
-          render();
-        },
+        onToggle: onToggle,
         start: function (items) { runAll('start', items.map(function (item) { return item.id; })); },
         stop: function (items) { runAll('stop', items.map(function (item) { return item.id; })); },
       });
+      if (key === ORPHANS) row.classList.add('tp-group-orphans');
       groupRows.set(key, row);
       return row;
+    }
+
+    // "Remove all" in the Orphans section: Unraid's own "remove_image" for each, after asking.
+    function removeImages(items) {
+      modal({
+        title: 'Remove ' + items.length + ' orphan ' + (items.length === 1 ? 'image' : 'images') + '?',
+        message: 'No container uses ' + (items.length === 1 ? 'this image' : 'these images') + '. ' + (items.length === 1 ? 'It' : 'They') + ' will be deleted from Docker: ' + items.map(function (item) { return item.name; }).join(', ') + '.',
+        confirmLabel: 'Remove all',
+        danger: true,
+      }).then(function (confirmed) {
+        if (confirmed) runAll('remove_image', items.map(function (item) { return item.id; }), 'image');
+      });
+    }
+
+    // Unraid's orphan image rows: the image's id (its icon's id), tags and icon.
+    function orphanRows() {
+      return [...list.querySelectorAll(':scope > tr > td span.hand[onclick*="addDockerImageContext"]')].map(function (trigger) {
+        const row = trigger.closest('tr');
+        const tags = contextArguments(trigger)[1] || '';
+        const image = trigger.querySelector('img');
+        row.classList.add('tp-orphan');
+        return {
+          row: row,
+          id: trigger.id,
+          name: tags.split(',').filter(function (tag) { return tag && tag !== '<none>:<none>'; }).join(', ') || trigger.id.replace(/^sha256:/, '').slice(0, 12),
+          src: image && image.src,
+          trigger: trigger,
+          get text() { return row.textContent.toLowerCase(); },
+          running: false,
+          paused: false,
+        };
+      });
     }
 
     // Text is only written when it changed: writing inside the list wakes the refresh observer.
@@ -1144,14 +1294,16 @@
     // in their saved order, then "Ungrouped"; the containers in each section (and the whole list
     // when there are no groups) in Unraid's order. Runs after every refresh, and moves nothing
     // when the order is already right.
-    function layoutGroups(rows) {
+    function layoutGroups(rows, orphans) {
       const sections = store.groups.map(function (group) {
         return { key: 'g:' + group.name, group: group, title: group.name, items: rows.filter(function (item) { return group.containers.includes(item.name); }) };
       });
-      if (sections.length) {
+      const grouped = sections.length > 0;
+      if (grouped) {
         const rest = rows.filter(function (item) { return !store.of(item.name); });
         if (rest.length) sections.push({ key: UNGROUPED, group: null, title: 'Ungrouped', items: rest });
       }
+      if (orphans.length) sections.push({ key: ORPHANS, group: null, title: 'Orphans', items: orphans, orphans: true });
       const wanted = new Set(sections.map(function (section) { return section.key; }));
       groupRows.forEach(function (row, key) {
         if (!wanted.has(key)) {
@@ -1160,13 +1312,27 @@
         }
       });
 
-      const order = [];
+      // Without groups the containers come first, as a plain list.
+      const order = grouped ? [] : rows.map(function (item) { return item.row; });
       sections.forEach(function (section, index) {
         const header = groupRow(section.key, section.group);
         header.tpItems = section.items;
         header.tpKey = section.key;
         section.index = index;
         section.collapsed = collapsed.has(section.key);
+        if (section.orphans) {
+          updateSectionHeader(header, section, {
+            noun: 'orphan image',
+            noRunning: true,
+            app: function (item) { return { name: item.name, src: item.src, state: 'stopped', target: item.trigger }; },
+          });
+          order.push(header);
+          section.items.forEach(function (item) {
+            item.collapsed = section.collapsed;
+            order.push(item.row);
+          });
+          return;
+        }
         updateSectionHeader(header, section, {
           noun: 'container',
           groupCount: store.groups.length,
@@ -1279,7 +1445,9 @@
         name: appName ? appName.textContent.trim() : '',
         id: trigger ? trigger.id : '',
         collapsed: false,
-        text: row.textContent.toLowerCase(),
+        // Read only when searched or filtered (Aurora's view): the whole row's text is costly to
+        // read again on every change of a long list.
+        get text() { return row.textContent.toLowerCase(); },
         running: Boolean(name.querySelector('i.started')),
         paused: Boolean(name.querySelector('i.paused')),
         // "update ready" (and "rebuild ready") carry a flash icon; "not available" (no update
@@ -1301,11 +1469,12 @@
         if (name && name.title !== item.name) name.title = item.name;
         item.row.classList.toggle('tp-update', item.update);
       });
+      const orphans = folderView ? [] : orphanRows();
       if (folderView) {
         arrangeFolders();
       } else {
         rows.forEach(function (item) { decorate(item.row); });
-        layoutGroups(rows);
+        layoutGroups(rows, orphans);
       }
       table.classList.toggle('tp-compact', compact);
       table.classList.toggle('tp-advanced', Boolean(nativeToggle && nativeToggle.checked));
@@ -1346,6 +1515,11 @@
           || (activeFilter === 'stopped' && !item.running && !item.paused)
           || (activeFilter === 'updates' && item.update);
         item.visible = matchesFilter && item.text.includes(query);
+        item.row.classList.toggle('tp-filtered-out', !item.visible || item.collapsed);
+      });
+      // Orphan images are no containers: they show with "All" only.
+      orphans.forEach(function (item) {
+        item.visible = activeFilter === 'all' && item.text.includes(query);
         item.row.classList.toggle('tp-filtered-out', !item.visible || item.collapsed);
       });
       // A section whose containers are all filtered away is hidden with them; an empty group
@@ -1404,10 +1578,14 @@
     // the list never shows ungrouped. render() only moves or writes what changed, so its own
     // changes settle after one more pass. The list is shown once it is laid out (see
     // #docker_list.tp-ready in enhance.css, which also reveals it by itself after two seconds).
-    new MutationObserver(function () {
+    // With FolderView, which builds its folders in many small steps and has nothing for the
+    // theme to group, render() waits until the list has been still for a moment (debounce):
+    // running it on every step made a list of 300 containers settle half a second later.
+    const update = function () {
       render();
       markReady();
-    }).observe(list, { childList: true, subtree: true });
+    };
+    new MutationObserver(folderView ? debounce(update) : update).observe(list, { childList: true, subtree: true });
     roomToDragToTop(list);
     if (!folderView) {
       store.load();
@@ -1894,13 +2072,75 @@
     }, 4000);
   }
 
+  // Docker tab and Dashboard: the container list is loaded again when Unraid's record of image
+  // updates changes while the page is open (include/docker-updates.php), so a container updated
+  // in the background (CA Auto Update, "Update All" in another tab, the scheduled check) no
+  // longer shows "update ready". Updates started on the page itself already reload the list
+  // when their dialog is closed; the record is read again after every list load, so those do
+  // not load it twice. Checked every 20 seconds while the page is visible, and when it is
+  // shown again.
+  // Never while a check or an update is still running (the server's "busy", or "checking..."
+  // in the list after "Check for Updates" here): the list would show half the results, and
+  // Unraid's list code running beside the check could save the old results over the new ones.
+  // It is then asked again after a few seconds.
+  function dockerUpdateWatch() {
+    const list = document.getElementById('docker_list') || document.getElementById('docker_view');
+    if (!list || typeof window.loadlist !== 'function') return;
+    const url = PLUGIN_BASE + '/include/docker-updates.php';
+    let known = null;
+    let busy = false;
+    let soon = 0;
+    function read() {
+      return fetch(url, { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (response) { return response.ok ? response.json() : {}; })
+        .then(function (data) { return typeof data.stamp === 'string' ? data : null; });
+    }
+    function waiting() {
+      if (list.querySelector('.updatecolumn .fa-spin') || list.tpSorting) return true;
+      const dialog = document.querySelector('.sweet-alert.showSweetAlert, .sweet-alert.visible');
+      return Boolean(dialog && dialog.offsetParent !== null);
+    }
+    function check() {
+      if (busy || document.hidden) return;
+      busy = true;
+      read()
+        .then(function (data) {
+          if (!data) return;
+          if (known === null || data.stamp === known) { known = data.stamp; return; }
+          if (data.busy || waiting()) {
+            clearTimeout(soon);
+            soon = setTimeout(check, 6000);
+            return;
+          }
+          known = data.stamp;
+          window.loadlist();
+        })
+        .catch(function () {})
+        .finally(function () { busy = false; });
+    }
+    if (window.jQuery) {
+      window.jQuery(document).on('ajaxComplete', function (event, xhr, settings) {
+        if (/DockerContainers\.php|DashboardApps\.php/.test((settings && settings.url) || '')) {
+          read().then(function (data) { if (data) known = data.stamp; }).catch(function () {});
+        }
+      });
+    }
+    check();
+    setInterval(check, 20000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
+  }
+
   // Dashboard, Docker tile: an orange dot on the icon of every container with an update ready,
   // running or not (issue #24). Unraid redraws the tile's chips on each refresh.
   function dashboardUpdates() {
     const view = document.getElementById('docker_view');
-    if (!view) return;
+    // FolderView Plus marks updates on its own tile.
+    if (!view || folderViewPlus()) return;
     const mark = function () {
       view.querySelectorAll('span.outer.apps').forEach(function (chip) {
+        // A closed FolderView folder keeps its containers' chips in a hidden store; they are
+        // FolderView's and stay as they are.
+        if (chip.closest('.folder-storage')) return;
         const update = chipUpdate(chip);
         if (chip.classList.contains('tp-update') !== update) chip.classList.toggle('tp-update', update);
         // The tooltip is only taken away again if it is ours.
@@ -1919,7 +2159,8 @@
   // Unraid's small context menu offers, as large buttons. The buttons call Unraid's own functions.
   function dashboardContainers() {
     const view = document.getElementById('docker_view');
-    if (!view) return;
+    // FolderView Plus handles clicks on its tile itself; Unraid's own menu stays.
+    if (!view || folderViewPlus()) return;
     const safeUrl = function (url) { return /^https?:\/\//i.test(url || '') ? url : ''; };
 
     function open(chip) {
@@ -2249,6 +2490,23 @@
         if (header) header.classList.add('tp-gpu-moved');
       }
 
+      // Cells by what they hold, for enhance.css: a label (span.w36), a reading with a label
+      // (span.w26) and a usage bar (span.w44 with .usage-disk). Classes rather than :has()
+      // in the stylesheet: a :has() rule on every td is checked again on each change of any
+      // page, which slowed down busy pages (FolderView Plus's Docker list). Marked again if the
+      // plugin adds rows.
+      const markCells = function () {
+        tile.querySelectorAll(':scope > tr > td').forEach(function (cell) {
+          cell.classList.toggle('tp-gpu-w36', Boolean(cell.querySelector(':scope > span.w36')));
+          cell.classList.toggle('tp-gpu-w26', Boolean(cell.querySelector(':scope > span.w26')));
+        });
+        tile.querySelectorAll(':scope > tr > td > span.w44').forEach(function (span) {
+          span.classList.toggle('tp-gpu-bar', Boolean(span.querySelector(':scope > .usage-disk')));
+        });
+      };
+      markCells();
+      new MutationObserver(markCells).observe(tile, { childList: true });
+
       // A clock of 0 means the GPU is idle: an Intel GPU with nothing to do stops its clock
       // (power saving). It reads "idle" instead (enhance.css). The plugin rewrites the value
       // every few seconds, so it is watched and only marked, not replaced.
@@ -2270,6 +2528,8 @@
       dashboardGroups(view, 'docker');
       return;
     }
+    // FolderView Plus lays out its folders on the tile itself.
+    if (folderViewPlus()) return;
     // A line between a folder and the containers right after it, wherever the folder is (the
     // tile follows FolderView's order). Lines are only added or removed where that changed, so
     // the tile's observer settles.
@@ -2631,8 +2891,13 @@
   function helpButton() {
     const items = [...document.querySelectorAll('.nav-item.HelpButton')];
     if (!items.length) return;
+    let marked;
+    // Runs after every change of the page (a list rebuilt every few seconds): it only touches
+    // the button when the answer changes.
     const mark = function () {
       const none = !document.querySelector('.inline_help');
+      if (none === marked) return;
+      marked = none;
       items.forEach(function (item) {
         const link = item.querySelector('a');
         item.classList.toggle('tp-help-none', none);
@@ -2643,7 +2908,11 @@
       });
     };
     mark();
-    new MutationObserver(debounce(mark)).observe(document.getElementById('displaybox') || document.body, { childList: true, subtree: true });
+    // Lists rebuilt inside a table (Docker, VMs, live values) never add or remove help.
+    const later = debounce(mark);
+    new MutationObserver(function (records) {
+      if (records.some(function (record) { return !(record.target.closest && record.target.closest('table')); })) later();
+    }).observe(document.getElementById('displaybox') || document.body, { childList: true, subtree: true });
   }
 
   // Tools pages: their help text is given a clearer structure. Paragraphs written all in
@@ -2722,6 +2991,31 @@
   // Community Applications: its Change Log, Credits and Statistics view is shown as a modal by
   // the theme; a click on the dimmed backdrop closes it like its own close button. App names in
   // the search field are not spell-checked (no red underline).
+  // Dashboard, Disk Location tile: each bay lists the colours of its drive's orbs (grey for an
+  // empty bay, green, yellow, red, blue) in data-tp-orbs, which theme.css tints the bay by.
+  // Asked with :has() in the stylesheet instead, every table cell on every page took part in
+  // each restyle (FolderView Plus's Docker list loaded half again as slowly).
+  function diskLocationBays() {
+    const tile = document.getElementById('tblDiskLocation');
+    if (!tile) return;
+    tile.querySelectorAll('.flex-container-layout_h > div').forEach(function (bay) {
+      const colours = [];
+      bay.querySelectorAll('i.orb-disklocation').forEach(function (orb) {
+        const colour = (orb.className.match(/\b(grey|green|yellow|red|blue)-orb-disklocation\b/) || [])[1];
+        if (colour && !colours.includes(colour)) colours.push(colour);
+      });
+      if (colours.length) bay.dataset.tpOrbs = colours.join(' ');
+    });
+  }
+
+  // Tables in the page content: a row whose first cell is bold (inline) is a section heading;
+  // theme.css styles its other cells by the class set here.
+  function sectionRows() {
+    document.querySelectorAll('#displaybox table > tbody > tr > td:first-child[style*="bold"]').forEach(function (cell) {
+      if (/font-weight:\s*bold/.test(cell.getAttribute('style'))) cell.parentElement.classList.add('tp-section-row');
+    });
+  }
+
   function caOverlay() {
     const search = document.getElementById('searchBox');
     if (search) search.spellcheck = false;
@@ -3507,7 +3801,9 @@
 
     function decorate() {
       list.querySelectorAll('tr[parent-id]').forEach(function (row) {
-        if (row.dataset.tpExpand) return;
+        // A FolderView folder row looks like a VM's (parent-id and a details row) but is not one,
+        // and the rows in a closed folder's store are FolderView's.
+        if (row.dataset.tpExpand || row.classList.contains('folder') || row.closest('.folder-storage')) return;
         const id = 'name-' + row.getAttribute('parent-id');
         const details = document.getElementById(id);
         const cell = row.querySelector('td.vm-name');
@@ -4065,7 +4361,7 @@
 
   function start() {
     const info = pageInfo();
-    [function () { topBar(info); }, alertPill, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, sharesPage, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardUpdates, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
+    [function () { topBar(info); }, alertPill, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { folderViewBeta(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, sharesPage, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardUpdates, dockerUpdateWatch, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, diskLocationBays, sectionRows, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
       // One failing enhancer must not stop the others or the page's own scripts.
       try { enhancer(); } catch (error) { console.error('Aurora Theme:', error); }
     });
