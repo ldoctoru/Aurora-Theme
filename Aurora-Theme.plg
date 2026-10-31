@@ -3,7 +3,7 @@
 
 <PLUGIN name="Aurora-Theme"
         author="Tunefish"
-        version="2026.10.31.1556"
+        version="2026.10.31.1615"
         launch="Settings/AuroraThemeSettings"
         pluginURL="https://raw.githubusercontent.com/ldoctoru/Aurora-Theme/release/Aurora-Theme.plg"
         support="https://github.com/ldoctoru/Aurora-Theme/issues"
@@ -11,7 +11,7 @@
         min="7.2.0">
 
 <CHANGES>
-###2026.10.31.1556
+###2026.10.31.1615
 - New colours, fonts, tables, buttons, dialogs and notification panel for the Black and White themes.
 - Optional sidebar navigation layout.
 - Page enhancements: brand and server card in the sidebar, slim top bar, page headings, status pills, Docker summary and filters.
@@ -74,10 +74,10 @@ if [ -e /boot/config/plugins/$OLD.plg ] || [ -d /usr/local/emhttp/plugins/$OLD ]
   echo "Settings moved over from $OLD, which has been removed."
 fi
 old=$(sed -n 's/^[[:space:]]*version="\([^"]*\)".*/\1/p' /boot/config/plugins/Aurora-Theme.plg 2>/dev/null | head -n 1)
-if [[ "$old" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}[A-Za-z0-9._-]*$ && "$old" != "2026.10.31.1556" ]]; then
+if [[ "$old" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}[A-Za-z0-9._-]*$ && "$old" != "2026.10.31.1615" ]]; then
   from=$(sed -n 's/.*"from":"\([^"]*\)".*/\1/p' /boot/config/plugins/Aurora-Theme/updated.json 2>/dev/null)
   [[ "$from" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}[A-Za-z0-9._-]*$ ]] || from=$old
-  printf '{"from":"%s","to":"%s","time":%s}\n' "$from" "2026.10.31.1556" "$(date +%s)" > /boot/config/plugins/Aurora-Theme/updated.json
+  printf '{"from":"%s","to":"%s","time":%s}\n' "$from" "2026.10.31.1615" "$(date +%s)" > /boot/config/plugins/Aurora-Theme/updated.json
 fi
 cat > /usr/local/emhttp/plugins/Aurora-Theme/AuroraTheme.page <<'AURORA_THEME_EOF'
 Menu="Buttons"
@@ -372,7 +372,7 @@ if (in_array(rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PAT
 <?php if ($auroraClasses): ?>
 <script>document.documentElement.classList.add(...<?= json_encode($auroraClasses) ?>);</script>
 <?php endif; ?>
-<?php if (substr('2026.10.31.1556', -4) === '-dev'): ?>
+<?php if (substr('2026.10.31.1615', -4) === '-dev'): ?>
 <?php // A dev build (version "...-dev", set by plugin/build.py) is installed: a "Dev" badge in the
       // top bar, linking to the settings, where the update channel goes back to stable. ?>
 <style id="aurora-dev-badge">
@@ -394,7 +394,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var badge = document.createElement('a');
   badge.className = 'tp-dev-badge';
   badge.href = '/Settings/AuroraThemeSettings';
-  badge.title = 'Aurora Theme dev build 2026.10.31.1556: a test version, installed because the update channel is set to dev builds. Click to change it.';
+  badge.title = 'Aurora Theme dev build 2026.10.31.1615: a test version, installed because the update channel is set to dev builds. Click to change it.';
   badge.innerHTML = '<i aria-hidden="true"></i><span>Aurora</span><b>Dev</b>';
   // Where it goes: with the sidebar shown, on its own line under Unraid's version (the version
   // row has room for the version and its update notice only); otherwise in
@@ -10532,16 +10532,23 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
   // Dashboard, Docker tile: a click on a container opens a dialog with its state and everything
   // Unraid's small context menu offers, as large buttons. The buttons call Unraid's own functions.
   function dashboardContainers() {
+    // The Dashboard's Docker tile and the Docker tab's list. With FolderView Plus only a click on
+    // a container's own icon opens the sheet; its folders and everything else stay with it.
     const view = document.getElementById('docker_view');
-    // FolderView Plus handles clicks on its tile itself; Unraid's own menu stays.
-    if (!view || folderViewPlus()) return;
+    const list = document.getElementById('docker_list');
+    if (!view && !list) return;
+    const plus = folderViewPlus();
     const safeUrl = function (url) { return /^https?:\/\//i.test(url || '') ? url : ''; };
 
     function open(chip) {
       // Only the chip's own icon: a FolderView folder holds its containers' chips inside it, and
       // a folder keeps its own menu (Expand, Stop, ...).
       if (chip.matches('[class*="folder-"]')) return false;
-      const trigger = chip.querySelector(':scope > span.hand[onclick*="addDockerContainerContext"]');
+      return openTrigger(chip.querySelector(':scope > span.hand[onclick*="addDockerContainerContext"]'));
+    }
+
+    function openTrigger(trigger) {
+      if (!trigger) return false;
       const args = contextArguments(trigger);
       if (args.length < 11 || typeof window.eventControl !== 'function') return false;
       const ct = {
@@ -10664,6 +10671,29 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
       return true;
     }
 
+    // Docker tab: a click on a container's icon or name opens the sheet; the small menu stays on
+    // the right click and on the row's own menu button.
+    if (list) {
+      let smallMenu = false;
+      list.addEventListener('click', function (event) {
+        if (smallMenu || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        const trigger = event.target.closest && event.target.closest('td.ct-name span.hand[onclick*="addDockerContainerContext"]');
+        if (trigger && !trigger.closest('tr.folder, td.folder-name') && openTrigger(trigger)) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }, true);
+      list.addEventListener('contextmenu', function (event) {
+        const trigger = event.target.closest && event.target.closest('td.ct-name span.hand[onclick*="addDockerContainerContext"]');
+        if (!trigger) return;
+        event.preventDefault();
+        smallMenu = true;
+        openMenuFrom(trigger, trigger);
+        smallMenu = false;
+      });
+    }
+    if (!view) return;
+
     // FolderView folder: a click opens or closes it in place (FolderView's own expandFolderDocker);
     // its menu (Stop all, Edit, ...) moves to the right click or a long press.
     const folderId = function (chip) {
@@ -10673,7 +10703,7 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
     // The menu is shown by Unraid's menu script on the click that builds it, so the right click
     // sends the folder icon a click of its own, which the handler below lets through.
     let menuClick = false;
-    view.addEventListener('contextmenu', function (event) {
+    if (!plus) view.addEventListener('contextmenu', function (event) {
       const chip = event.target.closest('span.outer.apps');
       const hand = chip && folderId(chip) && chip.querySelector(':scope > span.hand');
       if (!hand) return;
@@ -10687,7 +10717,7 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
     view.addEventListener('click', function (event) {
       const chip = event.target.closest('span.outer.apps');
       if (!chip || event.button !== 0 || menuClick) return;
-      const id = folderId(chip);
+      const id = plus ? '' : folderId(chip);
       if (id && typeof expandFolderDocker === 'function') {
         event.preventDefault();
         event.stopPropagation();
@@ -13183,7 +13213,7 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
     const info = pageInfo();
     // The Dashboard's enhancers are skipped elsewhere without each looking for its tiles.
     const onDashboard = Boolean(document.getElementById('db_box1'));
-    const dashboardOnly = new Set([dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardUpdates, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans]);
+    const dashboardOnly = new Set([dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardUpdates, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans]);
     [function () { topBar(info); }, alertPill, problemList, opsPill, quickJump, themeSwitch, autoTheme, function () { serverCard(info); }, function () { pageHeading(info); }, function () { folderViewBeta(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, sharesPage, selectLists, lockState, docker, dockerPorts, containerGraphs, logFilter, vmViewSwitch, vmGroups, vmDetails, mainTables, diskTemps, arrayOperations, dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardUpdates, dockerUpdateWatch, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, diskLocationBays, sectionRows, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
       if (!onDashboard && dashboardOnly.has(enhancer)) return;
       // One failing enhancer must not stop the others or the page's own scripts.
@@ -26725,7 +26755,7 @@ cat > /boot/config/plugins/Aurora-Theme/stats.cron <<'AURORA_THEME_EOF'
 AURORA_THEME_EOF
 /usr/bin/php /usr/local/emhttp/plugins/Aurora-Theme/scripts/schedule.php
 echo ""
-echo "Aurora-Theme 2026.10.31.1556 is installed."
+echo "Aurora-Theme 2026.10.31.1615 is installed."
 echo "Settings: Settings > User Utilities > Aurora Theme"
 echo ""
 ]]>
