@@ -4684,58 +4684,78 @@
     setInterval(load, 60000);
   }
 
-  // Docker page: a small CPU and memory graph beside each running container's figures, from
-  // the values Unraid writes every few seconds (kept for the last three minutes, in this tab only).
+  // Docker page: a small CPU and memory graph under each running container's name, in every
+  // view. The figures come from include/container-load.php every 10 seconds while the page is
+  // visible; the last five minutes are kept in this tab only.
   function containerGraphs() {
     const list = document.getElementById('docker_list');
     if (!list || folderViewPlus()) return;
     const history = new Map();
     const SVG = 'http://www.w3.org/2000/svg';
-    const KEEP = 60;
-    function value(cell, kind) {
-      const text = cell.textContent.trim();
-      if (kind === 'cpu') return /^[\d.,]+%$/.test(text) ? parseFloat(text.replace(',', '.')) : null;
-      const parts = text.split('/');
-      const bytes = function (part) {
-        const match = String(part).trim().match(/^([\d.,]+)\s*([KMGT]?)i?B$/i);
-        return match ? parseFloat(match[1].replace(',', '.')) * Math.pow(1024, ' KMGT'.indexOf(match[2].toUpperCase() || ' ')) : 0;
-      };
-      const used = bytes(parts[0] || '');
-      const limit = bytes(parts[1] || '');
-      return limit > 0 ? used / limit * 100 : null;
-    }
-    function draw(cell, values, kind) {
-      let svg = cell.nextElementSibling;
-      if (!svg || !svg.classList || !svg.classList.contains('tp-spark')) {
-        svg = document.createElementNS(SVG, 'svg');
-        svg.setAttribute('class', 'tp-spark tp-spark-' + kind);
-        svg.setAttribute('viewBox', '0 0 60 16');
-        svg.setAttribute('preserveAspectRatio', 'none');
-        svg.setAttribute('aria-hidden', 'true');
-        svg.append(document.createElementNS(SVG, 'polyline'));
-        cell.after(svg);
+    const KEEP = 30;
+    let failures = 0;
+
+    function line(svg, kind, values, top) {
+      let poly = svg.querySelector('.tp-spark-' + kind);
+      if (!poly) {
+        poly = document.createElementNS(SVG, 'polyline');
+        poly.setAttribute('class', 'tp-spark-' + kind);
+        svg.append(poly);
       }
-      const top = kind === 'cpu' ? Math.max(5, Math.max.apply(null, values)) : 100;
       const step = 60 / (KEEP - 1);
       const start = KEEP - values.length;
-      svg.firstChild.setAttribute('points', values.map(function (v, i) { return ((start + i) * step).toFixed(1) + ',' + (15 - v / top * 14).toFixed(1); }).join(' '));
+      poly.setAttribute('points', values.map(function (v, i) { return ((start + i) * step).toFixed(1) + ',' + (15 - Math.min(v, top) / top * 14).toFixed(1); }).join(' '));
     }
-    function sample() {
-      if (document.hidden) return;
-      list.querySelectorAll('[class^="cpu-"], [class^="mem-"]').forEach(function (cell) {
-        const kind = cell.className.startsWith('cpu-') ? 'cpu' : 'mem';
-        const v = value(cell, kind);
-        if (v == null || !cell.closest('tr') || !cell.closest('tr').querySelector('td.ct-name i.started')) return;
-        const name = cell.className.split(' ')[0];
-        const values = history.get(name) || [];
-        values.push(v);
-        if (values.length > KEEP) values.shift();
-        history.set(name, values);
-        if (values.length > 1) draw(cell, values, kind);
+    function draw() {
+      list.querySelectorAll('td.ct-name:not(.folder-name)').forEach(function (cell) {
+        const nameNode = cell.querySelector('.appname');
+        const name = nameNode ? nameNode.textContent.trim() : '';
+        const data = history.get(name);
+        let box = cell.querySelector('.tp-spark-box');
+        if (!data || data.cpu.length < 2 || !cell.querySelector('i.started')) {
+          if (box) box.remove();
+          return;
+        }
+        if (!box) {
+          box = element('span', 'tp-spark-box');
+          const svg = document.createElementNS(SVG, 'svg');
+          svg.setAttribute('class', 'tp-spark');
+          svg.setAttribute('viewBox', '0 0 60 16');
+          svg.setAttribute('preserveAspectRatio', 'none');
+          svg.setAttribute('aria-hidden', 'true');
+          box.append(svg, element('span', 'tp-spark-text'));
+          (cell.querySelector('.inner') || cell).append(box);
+        }
+        const cpu = data.cpu[data.cpu.length - 1];
+        const mem = data.mem[data.mem.length - 1];
+        line(box.firstChild, 'mem', data.mem, 100);
+        line(box.firstChild, 'cpu', data.cpu, Math.max(5, Math.max.apply(null, data.cpu)));
+        box.lastChild.textContent = 'CPU ' + cpu.toFixed(1) + '% · Mem ' + mem.toFixed(1) + '%';
+        box.title = 'Last ' + Math.round(data.cpu.length * 10 / 60 * 10) / 10 + ' min: CPU (blue) and memory (grey)';
       });
     }
-    setInterval(sample, 3000);
-    sample();
+    function load() {
+      if (document.hidden) return setTimeout(load, 10000);
+      getJson('/include/container-load.php').then(function (result) {
+        failures = 0;
+        const loadMap = result.load || {};
+        Object.keys(loadMap).forEach(function (name) {
+          const data = history.get(name) || { cpu: [], mem: [] };
+          data.cpu.push(Number(loadMap[name].cpu) || 0);
+          data.mem.push(Number(loadMap[name].mem) || 0);
+          if (data.cpu.length > KEEP) { data.cpu.shift(); data.mem.shift(); }
+          history.set(name, data);
+        });
+        draw();
+        setTimeout(load, 10000);
+      }).catch(function (error) {
+        if (++failures >= 3) return console.error('Aurora Theme container graphs:', error);
+        setTimeout(load, 20000);
+      });
+    }
+    // Unraid rebuilds the rows on refresh; the graphs are put back from what is kept.
+    new MutationObserver(debounce(function () { if (!list.querySelector('.tp-spark-box')) draw(); })).observe(list, { childList: true });
+    load();
   }
 
   // System log: errors and warnings stand out, and two buttons show only those lines. Unraid
