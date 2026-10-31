@@ -4206,30 +4206,63 @@ tbody.tp-cpu-tile > tr.tp-core .usage-disk {
     margin: 0 !important;
 }
 
-/* Core with hyper-threading: one tile, both loads at the top right, two thin bars below. */
+/* Core with hyper-threading: "Core 3" and the core's average on top, then one line per thread:
+   thread number, bar, load. The colour follows the load (blue, amber from 70%, red from 90%). */
 tbody.tp-cpu-tile > tr.tp-core-pair > td {
-    grid-template-columns: minmax(0, max-content) 1fr auto;
-    column-gap: 0.5rem;
-    grid-template-areas: "label v1 v2" "b1 b1 b1" "b2 b2 b2";
-    row-gap: 0.4rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "label avg" "t1 t1" "t2 t2";
+    row-gap: 0.5rem;
 }
+
+tbody.tp-cpu-tile > tr.tp-core-pair span.w26 { color: var(--tp-text); }
+
+.tp-core-avg {
+    grid-area: avg;
+    font: 700 1.35rem/1.2 var(--tp-font-heading);
+    font-variant-numeric: tabular-nums;
+    color: var(--tp-primary);
+}
+td[data-level="warm"] > .tp-core-avg { color: var(--tp-warn-text, #f59e0b); }
+td[data-level="hot"] > .tp-core-avg { color: var(--tp-danger, #ef4444); }
+tbody.tp-cpu-tile > tr.tp-core-pair > td[data-level="hot"] { border-color: color-mix(in srgb, var(--tp-danger, #ef4444) 45%, var(--tp-border)); }
 
 tbody.tp-cpu-tile > tr.tp-core-pair span.w36 {
-    display: contents;
+    display: flex !important;
+    align-items: center;
+    gap: 0.6rem;
+    width: auto !important;
+    margin: 0 !important;
 }
+tbody.tp-cpu-tile > tr.tp-core-pair span.w36:nth-of-type(2) { grid-area: t1; }
+tbody.tp-cpu-tile > tr.tp-core-pair span.w36:nth-of-type(3) { grid-area: t2; }
 
-tbody.tp-cpu-tile > tr.tp-core-pair span.w36:nth-of-type(2) .load { grid-area: v1; text-align: right; }
-tbody.tp-cpu-tile > tr.tp-core-pair span.w36:nth-of-type(2) .usage-disk { grid-area: b1; }
-tbody.tp-cpu-tile > tr.tp-core-pair span.w36:nth-of-type(3) .load { grid-area: v2; }
-tbody.tp-cpu-tile > tr.tp-core-pair span.w36:nth-of-type(3) .usage-disk { grid-area: b2; }
-
-tbody.tp-cpu-tile > tr.tp-core-pair .load {
-    font-size: 1.15rem;
+.tp-thread {
+    flex: none;
+    order: 0;
+    min-width: 2.2rem;
+    color: var(--tp-muted);
+    font: 600 1.05rem/1 var(--tp-font-heading);
+    font-variant-numeric: tabular-nums;
 }
 
 tbody.tp-cpu-tile > tr.tp-core-pair .usage-disk {
-    height: 0.35rem !important;
+    flex: 1;
+    order: 1;
+    height: 0.45rem !important;
 }
+
+tbody.tp-cpu-tile > tr.tp-core-pair .load {
+    flex: none;
+    order: 2;
+    min-width: 3.6rem;
+    color: var(--tp-muted) !important;
+    font-size: 1.1rem;
+    text-align: right;
+}
+
+tbody.tp-cpu-tile > tr.tp-core-pair span.w36 .usage-disk > span:first-child { background: var(--tp-primary) !important; }
+tbody.tp-cpu-tile > tr.tp-core-pair span.w36[data-level="warm"] .usage-disk > span:first-child { background: var(--tp-warn-text, #f59e0b) !important; }
+tbody.tp-cpu-tile > tr.tp-core-pair span.w36[data-level="hot"] .usage-disk > span:first-child { background: var(--tp-danger, #ef4444) !important; }
 
 /* ---- Dashboard column labels when tiles are grouped (dashboardGrouping) ---- */
 .tp-group-label {
