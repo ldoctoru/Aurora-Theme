@@ -3,6 +3,7 @@
 //   GET          returns {"items": [{"tone": "danger|warn|info|ok", "title": "...", "detail": "...", "href": "/Main"}, ...],
 //                         "counts": {"danger": n, "warn": n}}
 //   GET ?counts  only {"counts": ...}, without the Docker check, for the top bar on every page
+//   GET ?list    every problem (danger, warn, info), not only four, for the top bar's problem list
 // Problems come first (danger, then warn, then info); "ok" items follow, so the list always
 // starts with the four most useful facts. Read-only: nothing is changed here.
 header('Content-Type: application/json');
@@ -130,4 +131,8 @@ if ($countsOnly) {
 
 $rank = ['danger' => 0, 'warn' => 1, 'info' => 2, 'ok' => 3];
 usort($items, function ($a, $b) use ($rank) { return $rank[$a['tone']] <=> $rank[$b['tone']]; });
+if (isset($_GET['list'])) {
+    echo json_encode(['items' => array_values(array_filter($items, function ($item) { return $item['tone'] !== 'ok'; })), 'counts' => $counts]);
+    exit;
+}
 echo json_encode(['items' => array_slice($items, 0, 4), 'counts' => $counts]);

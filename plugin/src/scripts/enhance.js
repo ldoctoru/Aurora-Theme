@@ -4411,9 +4411,404 @@
     scan();
   }
 
+  const OPTIONS = window.auroraOptions || {};
+
+  function getJson(path) {
+    return fetch(PLUGIN_BASE + path, { credentials: 'same-origin', cache: 'no-store' }).then(function (response) {
+      if (!response.ok) throw new Error(path + ' failed with status ' + response.status);
+      return response.json();
+    });
+  }
+
+  // Every page: Ctrl+K (⌘K) or "/" opens a search over pages, settings, apps, VMs and shares
+  // (include/jump.php, loaded on first use, plus the menu's own tabs). Arrows pick, Enter opens.
+  function quickJump() {
+    if (OPTIONS.quickJump === false) return;
+    let items = null;
+    let open = null;
+
+    function load() {
+      if (items) return Promise.resolve(items);
+      const menu = [...document.querySelectorAll('#menu a[href^="/"]')].map(function (link) {
+        return { title: link.textContent.trim(), group: 'Tab', href: link.getAttribute('href') };
+      }).filter(function (item) { return item.title; });
+      return getJson('/include/jump.php').then(function (data) { return data.items || []; }, function (error) {
+        console.error('Aurora Theme quick jump:', error);
+        return [];
+      }).then(function (found) {
+        const seen = new Set();
+        items = menu.concat(found).filter(function (item) {
+          const key = item.title.toLowerCase() + '|' + item.href;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        return items;
+      });
+    }
+
+    function show() {
+      if (open) return;
+      const previousFocus = document.activeElement;
+      const backdrop = element('div', 'tp-modal-backdrop tp-jump-backdrop');
+      const box = element('div', 'tp-jump');
+      box.setAttribute('role', 'dialog');
+      box.setAttribute('aria-modal', 'true');
+      box.setAttribute('aria-label', 'Quick jump');
+      const input = element('input', 'tp-jump-input');
+      input.type = 'search';
+      input.placeholder = 'Jump to a page, setting, app, VM or share…';
+      input.setAttribute('aria-label', input.placeholder);
+      input.setAttribute('aria-controls', 'tp-jump-list');
+      const list = element('ul', 'tp-jump-list');
+      list.id = 'tp-jump-list';
+      list.setAttribute('role', 'listbox');
+      const hint = element('p', 'tp-jump-hint', '↑ ↓ to choose · Enter to open · Esc to close');
+      box.append(input, list, hint);
+      backdrop.append(box);
+      document.body.append(backdrop);
+      input.focus();
+      let shown = [];
+      let active = 0;
+
+      function close() {
+        backdrop.remove();
+        document.removeEventListener('keydown', onKey, true);
+        open = null;
+        if (previousFocus && previousFocus.focus) previousFocus.focus();
+      }
+      function go(item) {
+        if (item) location.href = item.href;
+      }
+      function render() {
+        const query = input.value.trim().toLowerCase();
+        const all = items || [];
+        shown = (query ? all.filter(function (item) { return item.title.toLowerCase().includes(query) || item.group.toLowerCase() === query; }) : all.filter(function (item) { return item.group === 'Tab'; }))
+          .sort(function (a, b) { return query ? (b.title.toLowerCase().startsWith(query) ? 1 : 0) - (a.title.toLowerCase().startsWith(query) ? 1 : 0) : 0; })
+          .slice(0, 12);
+        active = Math.min(active, Math.max(shown.length - 1, 0));
+        list.replaceChildren(...shown.map(function (item, index) {
+          const row = element('li', 'tp-jump-item' + (index === active ? ' tp-active' : ''));
+          row.setAttribute('role', 'option');
+          row.setAttribute('aria-selected', index === active ? 'true' : 'false');
+          row.append(element('span', 'tp-jump-title', item.title), element('span', 'tp-jump-group', item.group));
+          row.addEventListener('mousedown', function (event) { event.preventDefault(); go(item); });
+          return row;
+        }));
+        if (!shown.length) list.append(element('li', 'tp-jump-empty', items ? 'Nothing found' : 'Loading…'));
+      }
+      function onKey(event) {
+        if (event.key === 'Escape') { event.preventDefault(); close(); }
+        else if (event.key === 'ArrowDown') { event.preventDefault(); active = Math.min(active + 1, shown.length - 1); render(); }
+        else if (event.key === 'ArrowUp') { event.preventDefault(); active = Math.max(active - 1, 0); render(); }
+        else if (event.key === 'Enter') { event.preventDefault(); go(shown[active]); }
+      }
+      input.addEventListener('input', function () { active = 0; render(); });
+      backdrop.addEventListener('mousedown', function (event) { if (event.target === backdrop) close(); });
+      document.addEventListener('keydown', onKey, true);
+      open = close;
+      render();
+      load().then(render);
+    }
+
+    document.addEventListener('keydown', function (event) {
+      const typing = event.target.closest && event.target.closest('input, textarea, select, [contenteditable="true"], .CodeMirror');
+      if ((event.key === 'k' || event.key === 'K') && (event.ctrlKey || event.metaKey) && !event.altKey) {
+        event.preventDefault();
+        if (open) open(); else show();
+      } else if (event.key === '/' && !typing && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        show();
+      }
+    });
+    const crumb = document.querySelector('#header .tp-crumb');
+    if (crumb && !crumb.querySelector('.tp-jump-button')) {
+      const mac = /Mac|iPhone|iPad/.test(navigator.platform || '');
+      crumb.append(iconButton('search', 'Quick jump (' + (mac ? '⌘K' : 'Ctrl+K') + ')', show, 'tp-jump-button'));
+    }
+  }
+
+  // Top bar, every page: a parity check, rebuild or the mover, with how far it is and the time
+  // left (include/ops.php). Checked every 15 seconds while something runs, else every minute.
+  function opsPill() {
+    if (OPTIONS.opsPill === false) return;
+    const crumb = document.querySelector('#header .tp-crumb');
+    if (!crumb || crumb.querySelector('.tp-ops-pill')) return;
+    const pill = element('a', 'tp-ops-pill');
+    pill.href = '/Main';
+    pill.hidden = true;
+    crumb.append(pill);
+    let failures = 0;
+    function left(seconds) {
+      if (seconds == null) return '';
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.max(1, Math.round((seconds % 3600) / 60));
+      return (hours ? hours + ' h ' : '') + minutes + ' min left';
+    }
+    function load() {
+      if (document.hidden) return setTimeout(load, 60000);
+      getJson('/include/ops.php').then(function (data) {
+        failures = 0;
+        const ops = data.ops || [];
+        pill.hidden = !ops.length;
+        const text = ops.map(function (op) {
+          return [op.title, op.percent != null ? op.percent + '%' : '', left(op.left)].filter(Boolean).join(' · ');
+        }).join('  |  ');
+        pill.textContent = '';
+        if (ops.length) {
+          pill.append(element('i', 'fa fa-refresh tp-ops-spin'), document.createTextNode(' ' + text));
+          const percent = ops[0].percent;
+          pill.style.setProperty('--tp-ops', percent != null ? percent + '%' : '0%');
+          pill.title = text;
+        }
+        setTimeout(load, ops.length ? 15000 : 60000);
+      }).catch(function (error) {
+        if (++failures >= 3) return console.error('Aurora Theme operations:', error);
+        setTimeout(load, 60000);
+      });
+    }
+    load();
+  }
+
+  // Top bar: clicking the problem count lists every problem with a link to it (health.php?list).
+  function problemList() {
+    const pill = document.querySelector('#header .tp-alert-pill');
+    if (!pill || pill.tpList) return;
+    pill.tpList = true;
+    pill.setAttribute('aria-haspopup', 'dialog');
+    let panel = null;
+    function close() {
+      if (!panel) return;
+      panel.remove();
+      panel = null;
+      pill.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('mousedown', outside, true);
+      document.removeEventListener('keydown', onKey, true);
+    }
+    function outside(event) { if (panel && !panel.contains(event.target) && event.target !== pill) close(); }
+    function onKey(event) { if (event.key === 'Escape') { close(); pill.focus(); } }
+    pill.addEventListener('click', function (event) {
+      if (event.ctrlKey || event.metaKey || event.shiftKey) return;
+      event.preventDefault();
+      if (panel) return close();
+      panel = element('div', 'tp-problems');
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-label', 'Problems');
+      const list = element('ul', 'tp-problems-list');
+      list.append(element('li', 'tp-problems-empty', 'Loading…'));
+      panel.append(list);
+      const rect = pill.getBoundingClientRect();
+      panel.style.top = (rect.bottom + 6) + 'px';
+      panel.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 368)) + 'px';
+      document.body.append(panel);
+      pill.setAttribute('aria-expanded', 'true');
+      document.addEventListener('mousedown', outside, true);
+      document.addEventListener('keydown', onKey, true);
+      getJson('/include/health.php?list').then(function (data) {
+        if (!panel) return;
+        const items = data.items || [];
+        list.replaceChildren(...items.map(function (item) {
+          const row = element('li', 'tp-problem tp-problem-' + item.tone);
+          const link = element('a', 'tp-problem-link');
+          link.href = String(item.href || '/Dashboard').startsWith('/') ? item.href : '/Dashboard';
+          link.append(element('strong', '', String(item.title)), element('span', '', String(item.detail || '')));
+          row.append(link);
+          return row;
+        }));
+        if (!items.length) list.append(element('li', 'tp-problems-empty', 'No problems found.'));
+        const first = list.querySelector('a');
+        if (first) first.focus();
+      }).catch(function (error) {
+        console.error('Aurora Theme problem list:', error);
+        if (panel) list.replaceChildren(element('li', 'tp-problems-empty', 'Could not load the list.'));
+      });
+    });
+  }
+
+  // Main page and Dashboard: disk temperatures coloured against each disk's own limits (Unraid's
+  // per-disk warning and critical settings, else Display Settings), with the hottest reading of
+  // the last 24 hours as the tooltip (include/disktemps.php).
+  function diskTemps() {
+    const tables = [...document.querySelectorAll('table.disk_status')];
+    const dash = document.getElementById('db_box1') ? [...document.querySelectorAll('#db_box1, #db_box2, #db_box3')] : [];
+    if (!tables.length && !dash.length) return;
+    let disks = null;
+    const TEMP = /^(\d+(?:[.,]\d+)?)\s*°\s*([CF])$/;
+    function key(row) {
+      const first = row.querySelector('td');
+      if (!first) return '';
+      const link = first.querySelector('a');
+      return ((link || first).textContent.split('(')[0] || '').toLowerCase().replace(/\s+/g, '');
+    }
+    function apply(cell, row) {
+      const text = cell.textContent.trim();
+      const match = TEMP.exec(text);
+      const disk = disks && disks[key(row)];
+      if (!match || !disk) return;
+      const celsius = match[2] === 'F' ? (parseFloat(match[1]) - 32) * 5 / 9 : parseFloat(match[1]);
+      const level = disk.max > 0 && celsius >= disk.max ? 'hot' : disk.hot > 0 && celsius >= disk.hot ? 'warm' : 'ok';
+      const title = 'Warning at ' + disk.hot + ' °C, critical at ' + disk.max + ' °C' + (disk.peak != null ? ' · hottest in 24 h: ' + disk.peak + ' °C' : '');
+      if (cell.dataset.level !== level) cell.dataset.level = level;
+      if (cell.title !== title) cell.title = title;
+      if (!cell.classList.contains('tp-temp')) cell.classList.add('tp-temp');
+      if (!cell.querySelector('.tp-chip')) {
+        const chip = element('span', 'tp-chip', text);
+        cell.replaceChildren(chip);
+      }
+    }
+    function run() {
+      if (!disks) return;
+      tables.concat(dash).forEach(function (scope) {
+        scope.querySelectorAll('tr').forEach(function (row) {
+          row.querySelectorAll(':scope > td').forEach(function (cell) {
+            if (cell.classList.contains('tp-temp') || TEMP.test(cell.textContent.trim())) apply(cell, row);
+          });
+        });
+      });
+    }
+    const later = debounce(run, 300);
+    tables.concat(dash).forEach(function (scope) { new MutationObserver(later).observe(scope, { childList: true, subtree: true }); });
+    function load() {
+      if (!document.hidden) getJson('/include/disktemps.php').then(function (data) { disks = data.disks || {}; run(); }, function (error) { console.error('Aurora Theme disk temperatures:', error); });
+    }
+    load();
+    setInterval(load, 60000);
+  }
+
+  // Docker page: a small CPU and memory graph beside each running container's figures, from
+  // the values Unraid writes every few seconds (kept for the last three minutes, in this tab only).
+  function containerGraphs() {
+    const list = document.getElementById('docker_list');
+    if (!list || folderViewPlus()) return;
+    const history = new Map();
+    const SVG = 'http://www.w3.org/2000/svg';
+    const KEEP = 60;
+    function value(cell, kind) {
+      const text = cell.textContent.trim();
+      if (kind === 'cpu') return /^[\d.,]+%$/.test(text) ? parseFloat(text.replace(',', '.')) : null;
+      const parts = text.split('/');
+      const bytes = function (part) {
+        const match = String(part).trim().match(/^([\d.,]+)\s*([KMGT]?)i?B$/i);
+        return match ? parseFloat(match[1].replace(',', '.')) * Math.pow(1024, ' KMGT'.indexOf(match[2].toUpperCase() || ' ')) : 0;
+      };
+      const used = bytes(parts[0] || '');
+      const limit = bytes(parts[1] || '');
+      return limit > 0 ? used / limit * 100 : null;
+    }
+    function draw(cell, values, kind) {
+      let svg = cell.nextElementSibling;
+      if (!svg || !svg.classList || !svg.classList.contains('tp-spark')) {
+        svg = document.createElementNS(SVG, 'svg');
+        svg.setAttribute('class', 'tp-spark tp-spark-' + kind);
+        svg.setAttribute('viewBox', '0 0 60 16');
+        svg.setAttribute('preserveAspectRatio', 'none');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.append(document.createElementNS(SVG, 'polyline'));
+        cell.after(svg);
+      }
+      const top = kind === 'cpu' ? Math.max(5, Math.max.apply(null, values)) : 100;
+      const step = 60 / (KEEP - 1);
+      const start = KEEP - values.length;
+      svg.firstChild.setAttribute('points', values.map(function (v, i) { return ((start + i) * step).toFixed(1) + ',' + (15 - v / top * 14).toFixed(1); }).join(' '));
+    }
+    function sample() {
+      if (document.hidden) return;
+      list.querySelectorAll('[class^="cpu-"], [class^="mem-"]').forEach(function (cell) {
+        const kind = cell.className.startsWith('cpu-') ? 'cpu' : 'mem';
+        const v = value(cell, kind);
+        if (v == null || !cell.closest('tr') || !cell.closest('tr').querySelector('td.ct-name i.started')) return;
+        const name = cell.className.split(' ')[0];
+        const values = history.get(name) || [];
+        values.push(v);
+        if (values.length > KEEP) values.shift();
+        history.set(name, values);
+        if (values.length > 1) draw(cell, values, kind);
+      });
+    }
+    setInterval(sample, 3000);
+    sample();
+  }
+
+  // System log: errors and warnings stand out, and two buttons show only those lines. Unraid
+  // gives each line a span with its kind (error, warn, ...).
+  function logFilter() {
+    const box = [...document.querySelectorAll('pre, .syslog, #logs, #log')].find(function (node) {
+      return node.querySelector(':scope > span.error, :scope > span.warn, :scope > span.system, :scope > span.login, :scope > span.array');
+    });
+    if (!box || box.tpFilter) return;
+    box.tpFilter = true;
+    box.classList.add('tp-log');
+    const bar = element('div', 'tp-log-filter');
+    bar.setAttribute('role', 'group');
+    bar.setAttribute('aria-label', 'Show lines');
+    const modes = [['all', 'All lines'], ['errors', 'Errors'], ['warnings', 'Errors and warnings']];
+    const buttons = modes.map(function (mode) {
+      const button = element('button', 'tp-log-mode', mode[1]);
+      button.type = 'button';
+      button.dataset.mode = mode[0];
+      button.setAttribute('aria-pressed', mode[0] === 'all' ? 'true' : 'false');
+      button.addEventListener('click', function () { set(mode[0]); });
+      return button;
+    });
+    const count = element('span', 'tp-log-count');
+    bar.append(...buttons, count);
+    box.before(bar);
+    function set(mode) {
+      box.classList.toggle('tp-log-errors', mode === 'errors');
+      box.classList.toggle('tp-log-warnings', mode === 'warnings');
+      buttons.forEach(function (button) { button.setAttribute('aria-pressed', button.dataset.mode === mode ? 'true' : 'false'); });
+    }
+    function counts() {
+      const errors = box.querySelectorAll(':scope > span.error').length;
+      const warnings = box.querySelectorAll(':scope > span.warn').length;
+      count.textContent = errors + (errors === 1 ? ' error, ' : ' errors, ') + warnings + (warnings === 1 ? ' warning' : ' warnings');
+    }
+    new MutationObserver(debounce(counts, 500)).observe(box, { childList: true });
+    counts();
+  }
+
+  // Dark and light by themselves: following this computer's setting or a timetable. The switch
+  // is only pressed when that wish changes (remembered in this browser), so the sun / moon
+  // switch keeps working in between and two browsers do not fight over the server setting.
+  function autoTheme() {
+    const mode = OPTIONS.autoTheme;
+    if (mode !== 'system' && mode !== 'schedule') return;
+    const root = document.documentElement;
+    if (!root.classList.contains('Theme--black') && !root.classList.contains('Theme--white')) return;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    function minutes(text) { const parts = String(text).split(':'); return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10); }
+    function wanted() {
+      if (mode === 'system') return media.matches ? 'black' : 'white';
+      const now = new Date();
+      const at = now.getHours() * 60 + now.getMinutes();
+      const light = minutes(OPTIONS.lightAt);
+      const dark = minutes(OPTIONS.darkAt);
+      const day = light < dark ? at >= light && at < dark : at >= light || at < dark;
+      return day ? 'white' : 'black';
+    }
+    function check() {
+      let last;
+      try { last = localStorage.getItem('tp-autotheme'); } catch (error) { return; }
+      const want = mode + ':' + wanted();
+      if (last === want) return;
+      try { localStorage.setItem('tp-autotheme', want); } catch (error) { return; }
+      const current = root.classList.contains('Theme--black') ? 'black' : 'white';
+      const button = document.querySelector('.tp-theme-switch');
+      if (button && current !== wanted()) button.click();
+    }
+    media.addEventListener('change', check);
+    if (mode === 'schedule') setInterval(check, 60000);
+    // The switch is placed once Unraid's profile component has drawn.
+    setTimeout(check, 1500);
+  }
+
   function start() {
     const info = pageInfo();
-    [function () { topBar(info); }, alertPill, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { folderViewBeta(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, sharesPage, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardUpdates, dockerUpdateWatch, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, diskLocationBays, sectionRows, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
+    // The Dashboard's enhancers are skipped elsewhere without each looking for its tiles.
+    const onDashboard = Boolean(document.getElementById('db_box1'));
+    const dashboardOnly = new Set([dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardUpdates, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans]);
+    [function () { topBar(info); }, alertPill, problemList, opsPill, quickJump, themeSwitch, autoTheme, function () { serverCard(info); }, function () { pageHeading(info); }, function () { folderViewBeta(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, sharesPage, selectLists, lockState, docker, dockerPorts, containerGraphs, logFilter, vmViewSwitch, vmGroups, vmDetails, mainTables, diskTemps, arrayOperations, dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardUpdates, dockerUpdateWatch, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, diskLocationBays, sectionRows, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
+      if (!onDashboard && dashboardOnly.has(enhancer)) return;
       // One failing enhancer must not stop the others or the page's own scripts.
       try { enhancer(); } catch (error) { console.error('Aurora Theme:', error); }
     });
