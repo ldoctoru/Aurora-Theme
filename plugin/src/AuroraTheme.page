@@ -12,6 +12,7 @@ if (($aurora['layout'] ?? 'top') == 'sidebar') $auroraClasses[] = 'tp-sidebar';
 if (($aurora['enhance'] ?? 'yes') == 'yes') $auroraClasses[] = 'tp-enhance';
 if (($aurora['style'] ?? 'aurora') == 'console') $auroraClasses[] = 'tp-console';
 if (($aurora['style'] ?? 'aurora') == 'nexus') $auroraClasses[] = 'tp-nexus';
+if (($aurora['density'] ?? 'comfortable') == 'compact') $auroraClasses[] = 'tp-compact';
 // Display Settings, "Favorites enabled" set to No also turns off the theme's starred cards.
 if (($display['favorites'] ?? 'yes') == 'no') $auroraClasses[] = 'tp-no-favourites';
 // The page, from the first part of the address ("/Apps/..." gives tp-on-apps), so rules that
@@ -176,7 +177,13 @@ try {
 <script>window.auroraPageTitle = <?= json_encode($auroraTitle, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
 <?php endif; ?>
 <link type="text/css" rel="stylesheet" href="<?php autov('/plugins/Aurora-Theme/styles/enhance.css') ?>">
-<script>window.auroraHealth = <?= ($aurora['health'] ?? 'yes') == 'yes' ? 'true' : 'false' ?>; window.auroraDashboardGroups = <?= ($aurora['dashgroups'] ?? 'no') == 'yes' ? 'true' : 'false' ?>; window.auroraAppTiles = <?= ($aurora['apptiles'] ?? 'no') == 'yes' ? 'true' : 'false' ?>;</script>
+<script>window.auroraHealth = <?= ($aurora['health'] ?? 'yes') == 'yes' ? 'true' : 'false' ?>; window.auroraDashboardGroups = <?= ($aurora['dashgroups'] ?? 'no') == 'yes' ? 'true' : 'false' ?>; window.auroraAppTiles = <?= ($aurora['apptiles'] ?? 'no') == 'yes' ? 'true' : 'false' ?>; window.auroraOptions = <?= json_encode([
+  'quickJump' => ($aurora['quickjump'] ?? 'yes') == 'yes',
+  'opsPill' => ($aurora['opspill'] ?? 'yes') == 'yes',
+  'autoTheme' => in_array($aurora['autotheme'] ?? 'off', ['off', 'system', 'schedule']) ? ($aurora['autotheme'] ?? 'off') : 'off',
+  'lightAt' => preg_match('/^\d{2}:\d{2}$/', $aurora['autotheme_light'] ?? '') ? $aurora['autotheme_light'] : '07:00',
+  'darkAt' => preg_match('/^\d{2}:\d{2}$/', $aurora['autotheme_dark'] ?? '') ? $aurora['autotheme_dark'] : '19:00',
+], JSON_HEX_TAG) ?>;</script>
 <script defer src="<?php autov('/plugins/Aurora-Theme/scripts/enhance.js') ?>"></script>
 <?php
 // Plugins page: FolderView Plus beside FolderView3 or FolderView2 is not supported. The warning

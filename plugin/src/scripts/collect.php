@@ -3,6 +3,26 @@
 // Run by cron once a minute: stores one history point for the Stats page.
 require __DIR__ . '/../include/StatsLib.php';
 
+// Hottest temperature per disk and hour, kept for a day, for include/disktemps.php. Recorded
+// even when the Stats history is off.
+(function () {
+    $file = '/var/lib/aurora-theme/disktemp.json';
+    if (!is_dir(dirname($file))) @mkdir(dirname($file), 0755, true);
+    $peaks = json_decode((string) @file_get_contents($file), true);
+    $peaks = is_array($peaks) ? $peaks : [];
+    $hour = (int) floor(time() / 3600);
+    foreach ((array) @parse_ini_file('/var/local/emhttp/disks.ini', true) as $key => $disk) {
+        if (!is_array($disk) || !is_numeric($disk['temp'] ?? '')) continue;
+        $name = strtolower((string) ($disk['name'] ?? $key));
+        $peaks[$name][$hour] = max((int) ($peaks[$name][$hour] ?? 0), (int) $disk['temp']);
+    }
+    foreach ($peaks as $name => $hours) {
+        $peaks[$name] = array_filter((array) $hours, function ($h) use ($hour) { return (int) $h > $hour - 25; }, ARRAY_FILTER_USE_KEY);
+        if (!$peaks[$name]) unset($peaks[$name]);
+    }
+    @file_put_contents($file, json_encode($peaks), LOCK_EX);
+})();
+
 if (!tft_stats_enabled()) {
     exit(0);
 }

@@ -87,8 +87,48 @@ _(Problem count in the top bar)_:
   </select>
 
 > A pill next to the page name on every page with the number of problems found: failed, disabled
-> or hot disks, read or parity errors, and unread alerts. It opens the Dashboard. Needs page
+> or hot disks, read or parity errors, and unread alerts. Clicking it lists them. Needs page
 > enhancements.
+
+_(Quick jump)_:
+: <select name="quickjump">
+  <?=mk_option($aurora['quickjump'] ?? 'yes', "yes", _("Enabled (Ctrl+K)"))?>
+  <?=mk_option($aurora['quickjump'] ?? 'yes', "no", _("Disabled"))?>
+  </select>
+
+> Press Ctrl+K (⌘K on a Mac) or / on any page to search pages, settings, apps, VMs and shares,
+> and open the one you pick with Enter.
+
+_(Long operations in the top bar)_:
+: <select name="opspill">
+  <?=mk_option($aurora['opspill'] ?? 'yes', "yes", _("Shown"))?>
+  <?=mk_option($aurora['opspill'] ?? 'yes', "no", _("Hidden"))?>
+  </select>
+
+> While a parity check, rebuild or the mover runs, a pill in the top bar shows how far it is and
+> the time left, on every page.
+
+_(Table density)_:
+: <select name="density">
+  <?=mk_option($aurora['density'] ?? 'comfortable', "comfortable", _("Comfortable"))?>
+  <?=mk_option($aurora['density'] ?? 'comfortable', "compact", _("Compact"))?>
+  </select>
+
+> Compact uses less space between table rows, so more disks, apps and shares fit on screen.
+
+_(Automatic dark and light)_:
+: <select name="autotheme">
+  <?=mk_option($aurora['autotheme'] ?? 'off', "off", _("Off: only the sun / moon switch"))?>
+  <?=mk_option($aurora['autotheme'] ?? 'off', "system", _("Follow this computer's setting"))?>
+  <?=mk_option($aurora['autotheme'] ?? 'off', "schedule", _("On a timetable"))?>
+  </select>
+
+_(Light from / dark from)_:
+: <input type="time" name="autotheme_light" value="<?=htmlspecialchars($aurora['autotheme_light'] ?? '07:00')?>"> <input type="time" name="autotheme_dark" value="<?=htmlspecialchars($aurora['autotheme_dark'] ?? '19:00')?>">
+
+> The theme is a server setting, so it changes for every browser. It is only switched when your
+> computer's setting changes or a time on the timetable passes, so the sun / moon switch still
+> works in between. Needs the Black or White Dynamix theme.
 
 _(Dashboard app tiles)_:
 : <select name="apptiles">

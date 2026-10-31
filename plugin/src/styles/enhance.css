@@ -4444,3 +4444,126 @@ tbody.tp-cpu-tile > tr.tp-core-pair .usage-disk {
         padding-top: 0 !important;
     }
 }
+
+/* ---- Quick jump, Ctrl+K (quickJump) ---- */
+.tp-jump-backdrop { place-items: start center; padding-top: 12vh; }
+.tp-jump {
+    width: min(56rem, 100%);
+    border: 1px solid var(--tp-border, var(--border-color));
+    border-radius: 14px;
+    background-color: var(--tp-elevated, var(--background-color));
+    color: var(--tp-text, inherit);
+    box-shadow: var(--tp-shadow-lg, 0 20px 50px rgba(0, 0, 0, 0.4));
+    overflow: hidden;
+}
+.tp-jump-input {
+    box-sizing: border-box;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 1.4rem 1.6rem !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--tp-border, var(--border-color)) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: inherit !important;
+    font-size: 1.6rem !important;
+}
+.tp-jump-input:focus { outline: none; }
+.tp-jump-list { margin: 0; padding: 0.6rem; list-style: none; max-height: 50vh; overflow-y: auto; }
+.tp-jump-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.8rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.tp-jump-item.tp-active, .tp-jump-item:hover { background-color: var(--tp-primary-soft, rgba(59, 130, 246, 0.15)); }
+.tp-jump-group { color: var(--tp-muted, var(--alt-text-color)); font-size: 1.2rem; }
+.tp-jump-empty { padding: 1rem; color: var(--tp-muted, var(--alt-text-color)); }
+.tp-jump-hint { margin: 0; padding: 0.7rem 1.6rem; border-top: 1px solid var(--tp-border, var(--border-color)); color: var(--tp-muted, var(--alt-text-color)); font-size: 1.15rem; }
+.tp-jump-button { margin-left: 0.6rem; }
+
+/* ---- Long operations in the top bar (opsPill) ---- */
+.tp-ops-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: 0.8rem;
+    padding: 0.2rem 0.9rem;
+    border: 1px solid var(--tp-primary, #3b82f6);
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--tp-primary-soft, rgba(59, 130, 246, 0.2)) var(--tp-ops, 0%), transparent var(--tp-ops, 0%));
+    color: var(--tp-primary-text, var(--tp-primary, #3b82f6)) !important;
+    font-size: 1.2rem;
+    font-weight: 600;
+    text-decoration: none !important;
+    white-space: nowrap;
+}
+.tp-ops-pill[hidden] { display: none; }
+.tp-ops-spin { animation: tp-ops-spin 2s linear infinite; }
+@keyframes tp-ops-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .tp-ops-spin { animation: none; } }
+@media (max-width: 640px) { .tp-ops-pill { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; } }
+
+/* ---- Problem list under the problem count (problemList) ---- */
+.tp-problems {
+    position: fixed;
+    z-index: 100000;
+    width: min(36rem, calc(100vw - 16px));
+    border: 1px solid var(--tp-border, var(--border-color));
+    border-radius: 12px;
+    background-color: var(--tp-elevated, var(--background-color));
+    box-shadow: var(--tp-shadow-lg, 0 12px 30px rgba(0, 0, 0, 0.35));
+}
+.tp-problems-list { margin: 0; padding: 0.6rem; list-style: none; max-height: 60vh; overflow-y: auto; }
+.tp-problem-link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.8rem 1rem 0.8rem 1.2rem;
+    border-left: 3px solid var(--tp-muted, #888);
+    border-radius: 6px;
+    color: var(--tp-text, inherit) !important;
+    text-decoration: none !important;
+}
+.tp-problem-link:hover, .tp-problem-link:focus-visible { background-color: var(--tp-subtle, rgba(127, 127, 127, 0.1)); }
+.tp-problem-link span { color: var(--tp-muted, var(--alt-text-color)); font-size: 1.2rem; }
+.tp-problem-danger .tp-problem-link { border-left-color: var(--tp-danger, #ef4444); }
+.tp-problem-warn .tp-problem-link { border-left-color: var(--tp-warn-text, #f59e0b); }
+.tp-problem-info .tp-problem-link { border-left-color: var(--tp-primary, #3b82f6); }
+.tp-problems-empty { padding: 1rem; color: var(--tp-muted, var(--alt-text-color)); }
+
+/* ---- Container graphs on the Docker page (containerGraphs) ---- */
+.tp-spark { display: inline-block; width: 4.8rem; height: 1.4rem; margin-left: 0.5rem; vertical-align: middle; overflow: visible; }
+.tp-spark polyline { fill: none; stroke-width: 1.5; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.tp-spark-cpu polyline { stroke: var(--tp-primary, #3b82f6); }
+.tp-spark-mem polyline { stroke: var(--tp-muted, #94a3b8); }
+
+/* ---- System log (logFilter): errors and warnings stand out; filters hide the rest ---- */
+.tp-log-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin: 0 0 0.8rem; }
+.tp-log-mode {
+    margin: 0 !important;
+    padding: 0.4rem 1rem !important;
+    border: 1px solid var(--tp-border, var(--border-color)) !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+    color: var(--tp-text, inherit) !important;
+    font-size: 1.2rem !important;
+    text-transform: none !important;
+}
+.tp-log-mode[aria-pressed="true"] { border-color: var(--tp-primary, #3b82f6) !important; background-color: var(--tp-primary-soft, rgba(59, 130, 246, 0.15)) !important; }
+.tp-log-count { color: var(--tp-muted, var(--alt-text-color)); font-size: 1.2rem; }
+.tp-log > span.error { color: var(--tp-danger, #ef4444) !important; font-weight: 600; }
+.tp-log > span.warn { color: var(--tp-warn-text, #f59e0b) !important; }
+.tp-log.tp-log-errors, .tp-log.tp-log-warnings { font-size: 0 !important; }
+.tp-log.tp-log-errors > span, .tp-log.tp-log-warnings > span { display: none; }
+.tp-log.tp-log-errors > span.error,
+.tp-log.tp-log-warnings > span.error,
+.tp-log.tp-log-warnings > span.warn { display: block; font-size: 1.3rem; }
+
+/* ---- Table density: compact (Settings > Aurora Theme) ---- */
+:root.tp-compact table td, :root.tp-compact table th { padding-top: 0.35rem !important; padding-bottom: 0.35rem !important; }
+:root.tp-compact table tbody tr { height: auto !important; }
+:root.tp-compact .tp-chip, :root.tp-compact .tp-pill { padding-top: 0.05rem; padding-bottom: 0.05rem; }
