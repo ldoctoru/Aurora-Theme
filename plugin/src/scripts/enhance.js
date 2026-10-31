@@ -2184,16 +2184,23 @@
   // Dashboard, Docker tile: a click on a container opens a dialog with its state and everything
   // Unraid's small context menu offers, as large buttons. The buttons call Unraid's own functions.
   function dashboardContainers() {
+    // The Dashboard's Docker tile and the Docker tab's list. With FolderView Plus only a click on
+    // a container's own icon opens the sheet; its folders and everything else stay with it.
     const view = document.getElementById('docker_view');
-    // FolderView Plus handles clicks on its tile itself; Unraid's own menu stays.
-    if (!view || folderViewPlus()) return;
+    const list = document.getElementById('docker_list');
+    if (!view && !list) return;
+    const plus = folderViewPlus();
     const safeUrl = function (url) { return /^https?:\/\//i.test(url || '') ? url : ''; };
 
     function open(chip) {
       // Only the chip's own icon: a FolderView folder holds its containers' chips inside it, and
       // a folder keeps its own menu (Expand, Stop, ...).
       if (chip.matches('[class*="folder-"]')) return false;
-      const trigger = chip.querySelector(':scope > span.hand[onclick*="addDockerContainerContext"]');
+      return openTrigger(chip.querySelector(':scope > span.hand[onclick*="addDockerContainerContext"]'));
+    }
+
+    function openTrigger(trigger) {
+      if (!trigger) return false;
       const args = contextArguments(trigger);
       if (args.length < 11 || typeof window.eventControl !== 'function') return false;
       const ct = {
@@ -2316,6 +2323,29 @@
       return true;
     }
 
+    // Docker tab: a click on a container's icon or name opens the sheet; the small menu stays on
+    // the right click and on the row's own menu button.
+    if (list) {
+      let smallMenu = false;
+      list.addEventListener('click', function (event) {
+        if (smallMenu || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        const trigger = event.target.closest && event.target.closest('td.ct-name span.hand[onclick*="addDockerContainerContext"]');
+        if (trigger && !trigger.closest('tr.folder, td.folder-name') && openTrigger(trigger)) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }, true);
+      list.addEventListener('contextmenu', function (event) {
+        const trigger = event.target.closest && event.target.closest('td.ct-name span.hand[onclick*="addDockerContainerContext"]');
+        if (!trigger) return;
+        event.preventDefault();
+        smallMenu = true;
+        openMenuFrom(trigger, trigger);
+        smallMenu = false;
+      });
+    }
+    if (!view) return;
+
     // FolderView folder: a click opens or closes it in place (FolderView's own expandFolderDocker);
     // its menu (Stop all, Edit, ...) moves to the right click or a long press.
     const folderId = function (chip) {
@@ -2325,7 +2355,7 @@
     // The menu is shown by Unraid's menu script on the click that builds it, so the right click
     // sends the folder icon a click of its own, which the handler below lets through.
     let menuClick = false;
-    view.addEventListener('contextmenu', function (event) {
+    if (!plus) view.addEventListener('contextmenu', function (event) {
       const chip = event.target.closest('span.outer.apps');
       const hand = chip && folderId(chip) && chip.querySelector(':scope > span.hand');
       if (!hand) return;
@@ -2339,7 +2369,7 @@
     view.addEventListener('click', function (event) {
       const chip = event.target.closest('span.outer.apps');
       if (!chip || event.button !== 0 || menuClick) return;
-      const id = folderId(chip);
+      const id = plus ? '' : folderId(chip);
       if (id && typeof expandFolderDocker === 'function') {
         event.preventDefault();
         event.stopPropagation();
@@ -4835,7 +4865,7 @@
     const info = pageInfo();
     // The Dashboard's enhancers are skipped elsewhere without each looking for its tiles.
     const onDashboard = Boolean(document.getElementById('db_box1'));
-    const dashboardOnly = new Set([dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardUpdates, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans]);
+    const dashboardOnly = new Set([dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardUpdates, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans]);
     [function () { topBar(info); }, alertPill, problemList, opsPill, quickJump, themeSwitch, autoTheme, function () { serverCard(info); }, function () { pageHeading(info); }, function () { folderViewBeta(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, sharesPage, selectLists, lockState, docker, dockerPorts, containerGraphs, logFilter, vmViewSwitch, vmGroups, vmDetails, mainTables, diskTemps, arrayOperations, dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardUpdates, dockerUpdateWatch, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, diskLocationBays, sectionRows, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
       if (!onDashboard && dashboardOnly.has(enhancer)) return;
       // One failing enhancer must not stop the others or the page's own scripts.
