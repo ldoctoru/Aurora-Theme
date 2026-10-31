@@ -3,7 +3,7 @@
 
 <PLUGIN name="Aurora-Theme"
         author="Tunefish"
-        version="2026.10.31.1521"
+        version="2026.10.31.1544"
         launch="Settings/AuroraThemeSettings"
         pluginURL="https://raw.githubusercontent.com/ldoctoru/Aurora-Theme/release/Aurora-Theme.plg"
         support="https://github.com/ldoctoru/Aurora-Theme/issues"
@@ -11,7 +11,7 @@
         min="7.2.0">
 
 <CHANGES>
-###2026.10.31.1521
+###2026.10.31.1544
 - New colours, fonts, tables, buttons, dialogs and notification panel for the Black and White themes.
 - Optional sidebar navigation layout.
 - Page enhancements: brand and server card in the sidebar, slim top bar, page headings, status pills, Docker summary and filters.
@@ -74,10 +74,10 @@ if [ -e /boot/config/plugins/$OLD.plg ] || [ -d /usr/local/emhttp/plugins/$OLD ]
   echo "Settings moved over from $OLD, which has been removed."
 fi
 old=$(sed -n 's/^[[:space:]]*version="\([^"]*\)".*/\1/p' /boot/config/plugins/Aurora-Theme.plg 2>/dev/null | head -n 1)
-if [[ "$old" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}[A-Za-z0-9._-]*$ && "$old" != "2026.10.31.1521" ]]; then
+if [[ "$old" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}[A-Za-z0-9._-]*$ && "$old" != "2026.10.31.1544" ]]; then
   from=$(sed -n 's/.*"from":"\([^"]*\)".*/\1/p' /boot/config/plugins/Aurora-Theme/updated.json 2>/dev/null)
   [[ "$from" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}[A-Za-z0-9._-]*$ ]] || from=$old
-  printf '{"from":"%s","to":"%s","time":%s}\n' "$from" "2026.10.31.1521" "$(date +%s)" > /boot/config/plugins/Aurora-Theme/updated.json
+  printf '{"from":"%s","to":"%s","time":%s}\n' "$from" "2026.10.31.1544" "$(date +%s)" > /boot/config/plugins/Aurora-Theme/updated.json
 fi
 cat > /usr/local/emhttp/plugins/Aurora-Theme/AuroraTheme.page <<'AURORA_THEME_EOF'
 Menu="Buttons"
@@ -372,7 +372,7 @@ if (in_array(rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PAT
 <?php if ($auroraClasses): ?>
 <script>document.documentElement.classList.add(...<?= json_encode($auroraClasses) ?>);</script>
 <?php endif; ?>
-<?php if (substr('2026.10.31.1521', -4) === '-dev'): ?>
+<?php if (substr('2026.10.31.1544', -4) === '-dev'): ?>
 <?php // A dev build (version "...-dev", set by plugin/build.py) is installed: a "Dev" badge in the
       // top bar, linking to the settings, where the update channel goes back to stable. ?>
 <style id="aurora-dev-badge">
@@ -394,7 +394,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var badge = document.createElement('a');
   badge.className = 'tp-dev-badge';
   badge.href = '/Settings/AuroraThemeSettings';
-  badge.title = 'Aurora Theme dev build 2026.10.31.1521: a test version, installed because the update channel is set to dev builds. Click to change it.';
+  badge.title = 'Aurora Theme dev build 2026.10.31.1544: a test version, installed because the update channel is set to dev builds. Click to change it.';
   badge.innerHTML = '<i aria-hidden="true"></i><span>Aurora</span><b>Dev</b>';
   // Where it goes: with the sidebar shown, on its own line under Unraid's version (the version
   // row has room for the version and its update notice only); otherwise in
@@ -12852,10 +12852,19 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
         show();
       }
     });
-    const crumb = document.querySelector('#header .tp-crumb');
-    if (crumb && !crumb.querySelector('.tp-jump-button')) {
+    // The opener sits in the main menu, so it moves with it: a search field at the top of the
+    // sidebar, or a search icon at the end of the menu bar in the top layout.
+    const menu = document.getElementById('menu');
+    if (menu && !menu.querySelector('.tp-jump-open')) {
       const mac = /Mac|iPhone|iPad/.test(navigator.platform || '');
-      crumb.append(iconButton('search', 'Quick jump (' + (mac ? '⌘K' : 'Ctrl+K') + ')', show, 'tp-jump-button'));
+      const shortcut = mac ? '⌘K' : 'Ctrl+K';
+      const opener = element('button', 'tp-jump-open');
+      opener.type = 'button';
+      opener.title = 'Quick jump (' + shortcut + ')';
+      opener.setAttribute('aria-label', opener.title);
+      opener.append(element('i', 'fa fa-search'), element('span', 'tp-jump-open-text', 'Search'), element('kbd', 'tp-jump-open-key', shortcut));
+      opener.addEventListener('click', show);
+      menu.prepend(opener);
     }
   }
 
@@ -18249,7 +18258,42 @@ tbody.tp-cpu-tile > tr.tp-core-pair .usage-disk {
 .tp-jump-group { color: var(--tp-muted, var(--alt-text-color)); font-size: 1.2rem; }
 .tp-jump-empty { padding: 1rem; color: var(--tp-muted, var(--alt-text-color)); }
 .tp-jump-hint { margin: 0; padding: 0.7rem 1.6rem; border-top: 1px solid var(--tp-border, var(--border-color)); color: var(--tp-muted, var(--alt-text-color)); font-size: 1.15rem; }
-.tp-jump-button { margin-left: 0.6rem; }
+/* The opener in the main menu: a field at the top of the sidebar, an icon in the menu bar. */
+.tp-jump-open {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    box-sizing: border-box;
+    width: calc(100% - 2rem);
+    margin: 0 1rem 1.2rem !important;
+    padding: 0.7rem 1rem !important;
+    border: 1px solid var(--tp-border, var(--border-color)) !important;
+    border-radius: 10px !important;
+    background: var(--tp-subtle, transparent) !important;
+    color: var(--tp-muted, var(--alt-text-color)) !important;
+    font: inherit;
+    font-size: 1.3rem !important;
+    text-align: left;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    cursor: pointer;
+}
+.tp-jump-open:hover, .tp-jump-open:focus-visible { border-color: var(--tp-primary, #3b82f6) !important; color: var(--tp-text, inherit) !important; }
+.tp-jump-open-text { flex: 1; }
+.tp-jump-open-key { padding: 0.1rem 0.5rem; border: 1px solid var(--tp-border, var(--border-color)); border-radius: 5px; font: inherit; font-size: 1.1rem; }
+:root.tp-topbar #menu { position: relative; }
+:root.tp-topbar .tp-jump-open {
+    position: absolute;
+    top: 50%;
+    right: 1.2rem;
+    z-index: 2;
+    width: auto;
+    margin: 0 !important;
+    padding: 0.5rem 0.8rem !important;
+    transform: translateY(-50%);
+}
+:root.tp-topbar .tp-jump-open-text { display: none; }
+@media (max-width: 767px) { :root.tp-topbar .tp-jump-open { display: none; } }
 
 /* ---- Long operations in the top bar (opsPill) ---- */
 .tp-ops-pill {
@@ -26643,7 +26687,7 @@ cat > /boot/config/plugins/Aurora-Theme/stats.cron <<'AURORA_THEME_EOF'
 AURORA_THEME_EOF
 /usr/bin/php /usr/local/emhttp/plugins/Aurora-Theme/scripts/schedule.php
 echo ""
-echo "Aurora-Theme 2026.10.31.1521 is installed."
+echo "Aurora-Theme 2026.10.31.1544 is installed."
 echo "Settings: Settings > User Utilities > Aurora Theme"
 echo ""
 ]]>
