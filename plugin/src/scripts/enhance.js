@@ -2467,6 +2467,39 @@
         label.append(badge);
       }
       if (match[3]) row.classList.add('tp-core-pair');
+      if (!match[3]) return;
+
+      // Hyper-threaded core: "Core 3" with the core's average on top, then one line per thread
+      // (thread number, bar, load). Colours follow the load, never Unraid's red-for-busy text.
+      const badgeNode = label.querySelector('.tp-core-type');
+      label.textContent = 'Core ' + match[1];
+      if (badgeNode) label.append(badgeNode);
+      const average = element('span', 'tp-core-avg');
+      const cell = label.parentElement;
+      cell.insertBefore(average, label.nextSibling);
+      const threads = [...row.querySelectorAll('span.w36')];
+      [match[1], match[3]].forEach(function (number, index) {
+        if (threads[index]) threads[index].prepend(element('span', 'tp-thread', number));
+      });
+      const levelOf = function (value) { return value >= 90 ? 'hot' : value >= 70 ? 'warm' : 'ok'; };
+      const update = function () {
+        const values = threads.map(function (thread) {
+          const load = thread.querySelector('.load');
+          const value = load ? parseFloat(load.textContent) || 0 : 0;
+          if (thread.dataset.level !== levelOf(value)) thread.dataset.level = levelOf(value);
+          return value;
+        });
+        const mean = values.length ? Math.round(values.reduce(function (a, b) { return a + b; }, 0) / values.length) : 0;
+        const text = mean + '%';
+        if (average.textContent !== text) average.textContent = text;
+        if (cell.dataset.level !== levelOf(mean)) cell.dataset.level = levelOf(mean);
+        row.title = full + ': thread ' + match[1] + ' ' + values[0] + '%, thread ' + match[3] + ' ' + values[1] + '%';
+      };
+      threads.forEach(function (thread) {
+        const load = thread.querySelector('.load');
+        if (load) new MutationObserver(update).observe(load, { childList: true, characterData: true, subtree: true });
+      });
+      update();
     });
   }
 
