@@ -4521,10 +4521,19 @@
         show();
       }
     });
-    const crumb = document.querySelector('#header .tp-crumb');
-    if (crumb && !crumb.querySelector('.tp-jump-button')) {
+    // The opener sits in the main menu, so it moves with it: a search field at the top of the
+    // sidebar, or a search icon at the end of the menu bar in the top layout.
+    const menu = document.getElementById('menu');
+    if (menu && !menu.querySelector('.tp-jump-open')) {
       const mac = /Mac|iPhone|iPad/.test(navigator.platform || '');
-      crumb.append(iconButton('search', 'Quick jump (' + (mac ? '⌘K' : 'Ctrl+K') + ')', show, 'tp-jump-button'));
+      const shortcut = mac ? '⌘K' : 'Ctrl+K';
+      const opener = element('button', 'tp-jump-open');
+      opener.type = 'button';
+      opener.title = 'Quick jump (' + shortcut + ')';
+      opener.setAttribute('aria-label', opener.title);
+      opener.append(element('i', 'fa fa-search'), element('span', 'tp-jump-open-text', 'Search'), element('kbd', 'tp-jump-open-key', shortcut));
+      opener.addEventListener('click', show);
+      menu.prepend(opener);
     }
   }
 

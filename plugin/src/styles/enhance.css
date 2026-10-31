@@ -4483,7 +4483,42 @@ tbody.tp-cpu-tile > tr.tp-core-pair .usage-disk {
 .tp-jump-group { color: var(--tp-muted, var(--alt-text-color)); font-size: 1.2rem; }
 .tp-jump-empty { padding: 1rem; color: var(--tp-muted, var(--alt-text-color)); }
 .tp-jump-hint { margin: 0; padding: 0.7rem 1.6rem; border-top: 1px solid var(--tp-border, var(--border-color)); color: var(--tp-muted, var(--alt-text-color)); font-size: 1.15rem; }
-.tp-jump-button { margin-left: 0.6rem; }
+/* The opener in the main menu: a field at the top of the sidebar, an icon in the menu bar. */
+.tp-jump-open {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    box-sizing: border-box;
+    width: calc(100% - 2rem);
+    margin: 0 1rem 1.2rem !important;
+    padding: 0.7rem 1rem !important;
+    border: 1px solid var(--tp-border, var(--border-color)) !important;
+    border-radius: 10px !important;
+    background: var(--tp-subtle, transparent) !important;
+    color: var(--tp-muted, var(--alt-text-color)) !important;
+    font: inherit;
+    font-size: 1.3rem !important;
+    text-align: left;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    cursor: pointer;
+}
+.tp-jump-open:hover, .tp-jump-open:focus-visible { border-color: var(--tp-primary, #3b82f6) !important; color: var(--tp-text, inherit) !important; }
+.tp-jump-open-text { flex: 1; }
+.tp-jump-open-key { padding: 0.1rem 0.5rem; border: 1px solid var(--tp-border, var(--border-color)); border-radius: 5px; font: inherit; font-size: 1.1rem; }
+:root.tp-topbar #menu { position: relative; }
+:root.tp-topbar .tp-jump-open {
+    position: absolute;
+    top: 50%;
+    right: 1.2rem;
+    z-index: 2;
+    width: auto;
+    margin: 0 !important;
+    padding: 0.5rem 0.8rem !important;
+    transform: translateY(-50%);
+}
+:root.tp-topbar .tp-jump-open-text { display: none; }
+@media (max-width: 767px) { :root.tp-topbar .tp-jump-open { display: none; } }
 
 /* ---- Long operations in the top bar (opsPill) ---- */
 .tp-ops-pill {
