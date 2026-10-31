@@ -3,7 +3,7 @@
 
 <PLUGIN name="Aurora-Theme"
         author="Tunefish"
-        version="2026.10.31.1233"
+        version="2026.10.31.1521"
         launch="Settings/AuroraThemeSettings"
         pluginURL="https://raw.githubusercontent.com/ldoctoru/Aurora-Theme/release/Aurora-Theme.plg"
         support="https://github.com/ldoctoru/Aurora-Theme/issues"
@@ -11,7 +11,7 @@
         min="7.2.0">
 
 <CHANGES>
-###2026.10.31.1233
+###2026.10.31.1521
 - New colours, fonts, tables, buttons, dialogs and notification panel for the Black and White themes.
 - Optional sidebar navigation layout.
 - Page enhancements: brand and server card in the sidebar, slim top bar, page headings, status pills, Docker summary and filters.
@@ -74,10 +74,10 @@ if [ -e /boot/config/plugins/$OLD.plg ] || [ -d /usr/local/emhttp/plugins/$OLD ]
   echo "Settings moved over from $OLD, which has been removed."
 fi
 old=$(sed -n 's/^[[:space:]]*version="\([^"]*\)".*/\1/p' /boot/config/plugins/Aurora-Theme.plg 2>/dev/null | head -n 1)
-if [[ "$old" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}[A-Za-z0-9._-]*$ && "$old" != "2026.10.31.1233" ]]; then
+if [[ "$old" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}[A-Za-z0-9._-]*$ && "$old" != "2026.10.31.1521" ]]; then
   from=$(sed -n 's/.*"from":"\([^"]*\)".*/\1/p' /boot/config/plugins/Aurora-Theme/updated.json 2>/dev/null)
   [[ "$from" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}[A-Za-z0-9._-]*$ ]] || from=$old
-  printf '{"from":"%s","to":"%s","time":%s}\n' "$from" "2026.10.31.1233" "$(date +%s)" > /boot/config/plugins/Aurora-Theme/updated.json
+  printf '{"from":"%s","to":"%s","time":%s}\n' "$from" "2026.10.31.1521" "$(date +%s)" > /boot/config/plugins/Aurora-Theme/updated.json
 fi
 cat > /usr/local/emhttp/plugins/Aurora-Theme/AuroraTheme.page <<'AURORA_THEME_EOF'
 Menu="Buttons"
@@ -94,6 +94,7 @@ if (($aurora['layout'] ?? 'top') == 'sidebar') $auroraClasses[] = 'tp-sidebar';
 if (($aurora['enhance'] ?? 'yes') == 'yes') $auroraClasses[] = 'tp-enhance';
 if (($aurora['style'] ?? 'aurora') == 'console') $auroraClasses[] = 'tp-console';
 if (($aurora['style'] ?? 'aurora') == 'nexus') $auroraClasses[] = 'tp-nexus';
+if (($aurora['density'] ?? 'comfortable') == 'compact') $auroraClasses[] = 'tp-compact';
 // Display Settings, "Favorites enabled" set to No also turns off the theme's starred cards.
 if (($display['favorites'] ?? 'yes') == 'no') $auroraClasses[] = 'tp-no-favourites';
 // The page, from the first part of the address ("/Apps/..." gives tp-on-apps), so rules that
@@ -258,7 +259,13 @@ try {
 <script>window.auroraPageTitle = <?= json_encode($auroraTitle, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
 <?php endif; ?>
 <link type="text/css" rel="stylesheet" href="<?php autov('/plugins/Aurora-Theme/styles/enhance.css') ?>">
-<script>window.auroraHealth = <?= ($aurora['health'] ?? 'yes') == 'yes' ? 'true' : 'false' ?>; window.auroraDashboardGroups = <?= ($aurora['dashgroups'] ?? 'no') == 'yes' ? 'true' : 'false' ?>; window.auroraAppTiles = <?= ($aurora['apptiles'] ?? 'no') == 'yes' ? 'true' : 'false' ?>;</script>
+<script>window.auroraHealth = <?= ($aurora['health'] ?? 'yes') == 'yes' ? 'true' : 'false' ?>; window.auroraDashboardGroups = <?= ($aurora['dashgroups'] ?? 'no') == 'yes' ? 'true' : 'false' ?>; window.auroraAppTiles = <?= ($aurora['apptiles'] ?? 'no') == 'yes' ? 'true' : 'false' ?>; window.auroraOptions = <?= json_encode([
+  'quickJump' => ($aurora['quickjump'] ?? 'yes') == 'yes',
+  'opsPill' => ($aurora['opspill'] ?? 'yes') == 'yes',
+  'autoTheme' => in_array($aurora['autotheme'] ?? 'off', ['off', 'system', 'schedule']) ? ($aurora['autotheme'] ?? 'off') : 'off',
+  'lightAt' => preg_match('/^\d{2}:\d{2}$/', $aurora['autotheme_light'] ?? '') ? $aurora['autotheme_light'] : '07:00',
+  'darkAt' => preg_match('/^\d{2}:\d{2}$/', $aurora['autotheme_dark'] ?? '') ? $aurora['autotheme_dark'] : '19:00',
+], JSON_HEX_TAG) ?>;</script>
 <script defer src="<?php autov('/plugins/Aurora-Theme/scripts/enhance.js') ?>"></script>
 <?php
 // Plugins page: FolderView Plus beside FolderView3 or FolderView2 is not supported. The warning
@@ -365,7 +372,7 @@ if (in_array(rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PAT
 <?php if ($auroraClasses): ?>
 <script>document.documentElement.classList.add(...<?= json_encode($auroraClasses) ?>);</script>
 <?php endif; ?>
-<?php if (substr('2026.10.31.1233', -4) === '-dev'): ?>
+<?php if (substr('2026.10.31.1521', -4) === '-dev'): ?>
 <?php // A dev build (version "...-dev", set by plugin/build.py) is installed: a "Dev" badge in the
       // top bar, linking to the settings, where the update channel goes back to stable. ?>
 <style id="aurora-dev-badge">
@@ -387,7 +394,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var badge = document.createElement('a');
   badge.className = 'tp-dev-badge';
   badge.href = '/Settings/AuroraThemeSettings';
-  badge.title = 'Aurora Theme dev build 2026.10.31.1233: a test version, installed because the update channel is set to dev builds. Click to change it.';
+  badge.title = 'Aurora Theme dev build 2026.10.31.1521: a test version, installed because the update channel is set to dev builds. Click to change it.';
   badge.innerHTML = '<i aria-hidden="true"></i><span>Aurora</span><b>Dev</b>';
   // Where it goes: with the sidebar shown, on its own line under Unraid's version (the version
   // row has room for the version and its update notice only); otherwise in
@@ -533,8 +540,48 @@ _(Problem count in the top bar)_:
   </select>
 
 > A pill next to the page name on every page with the number of problems found: failed, disabled
-> or hot disks, read or parity errors, and unread alerts. It opens the Dashboard. Needs page
+> or hot disks, read or parity errors, and unread alerts. Clicking it lists them. Needs page
 > enhancements.
+
+_(Quick jump)_:
+: <select name="quickjump">
+  <?=mk_option($aurora['quickjump'] ?? 'yes', "yes", _("Enabled (Ctrl+K)"))?>
+  <?=mk_option($aurora['quickjump'] ?? 'yes', "no", _("Disabled"))?>
+  </select>
+
+> Press Ctrl+K (⌘K on a Mac) or / on any page to search pages, settings, apps, VMs and shares,
+> and open the one you pick with Enter.
+
+_(Long operations in the top bar)_:
+: <select name="opspill">
+  <?=mk_option($aurora['opspill'] ?? 'yes', "yes", _("Shown"))?>
+  <?=mk_option($aurora['opspill'] ?? 'yes', "no", _("Hidden"))?>
+  </select>
+
+> While a parity check, rebuild or the mover runs, a pill in the top bar shows how far it is and
+> the time left, on every page.
+
+_(Table density)_:
+: <select name="density">
+  <?=mk_option($aurora['density'] ?? 'comfortable', "comfortable", _("Comfortable"))?>
+  <?=mk_option($aurora['density'] ?? 'comfortable', "compact", _("Compact"))?>
+  </select>
+
+> Compact uses less space between table rows, so more disks, apps and shares fit on screen.
+
+_(Automatic dark and light)_:
+: <select name="autotheme">
+  <?=mk_option($aurora['autotheme'] ?? 'off', "off", _("Off: only the sun / moon switch"))?>
+  <?=mk_option($aurora['autotheme'] ?? 'off', "system", _("Follow this computer's setting"))?>
+  <?=mk_option($aurora['autotheme'] ?? 'off', "schedule", _("On a timetable"))?>
+  </select>
+
+_(Light from / dark from)_:
+: <input type="time" name="autotheme_light" value="<?=htmlspecialchars($aurora['autotheme_light'] ?? '07:00')?>"> <input type="time" name="autotheme_dark" value="<?=htmlspecialchars($aurora['autotheme_dark'] ?? '19:00')?>">
+
+> The theme is a server setting, so it changes for every browser. It is only switched when your
+> computer's setting changes or a time on the timetable passes, so the sun / moon switch still
+> works in between. Needs the Black or White Dynamix theme.
 
 _(Dashboard app tiles)_:
 : <select name="apptiles">
@@ -875,6 +922,12 @@ health="yes"
 dashgroups="no"
 apptiles="no"
 font="aurora"
+density="comfortable"
+autotheme="off"
+autotheme_light="07:00"
+autotheme_dark="19:00"
+quickjump="yes"
+opspill="yes"
 AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/fonts/ibm-plex-LICENSE.txt <<'AURORA_THEME_EOF'
 Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"
@@ -7331,6 +7384,47 @@ echo json_encode([
     'temps' => array_values($temps),
 ]);
 AURORA_THEME_EOF
+cat > /usr/local/emhttp/plugins/Aurora-Theme/include/disktemps.php <<'AURORA_THEME_EOF'
+<?php
+// Disk temperatures for the Main page and the Dashboard: Unraid's own limits per disk (or the
+// Display Settings defaults) and the hottest reading of the last 24 hours, kept by
+// scripts/collect.php. {"disks": {"disk1": {"temp": 38, "hot": 45, "max": 55, "peak": 41}, ...}}
+header('Content-Type: application/json');
+header('Cache-Control: no-store');
+
+$disks = (array) @parse_ini_file('/var/local/emhttp/disks.ini', true);
+$dynamix = array_replace_recursive(
+    (array) @parse_ini_file('/usr/local/emhttp/plugins/dynamix/default.cfg', true),
+    (array) @parse_ini_file('/boot/config/plugins/dynamix/dynamix.cfg', true)
+);
+$display = (array) ($dynamix['display'] ?? []);
+$peaks = json_decode((string) @file_get_contents('/var/lib/aurora-theme/disktemp.json'), true);
+$peaks = is_array($peaks) ? $peaks : [];
+$since = (int) floor(time() / 3600) - 24;
+
+$out = [];
+foreach ($disks as $key => $disk) {
+    if (!is_array($disk) || ($disk['device'] ?? '') === '') continue;
+    $name = strtolower((string) ($disk['name'] ?? $key));
+    $ssd = ($disk['rotational'] ?? '1') === '0';
+    $limit = function (string $field, string $setting, int $fallback) use ($disk, $display, $ssd): int {
+        if (isset($disk[$field]) && $disk[$field] !== '' && (int) $disk[$field] >= 0) return (int) $disk[$field];
+        if ($ssd && (int) ($display[$setting . 'ssd'] ?? -1) >= 0) return (int) $display[$setting . 'ssd'];
+        return (int) ($display[$setting] ?? $fallback);
+    };
+    $peak = null;
+    foreach ((array) ($peaks[$name] ?? []) as $hour => $value) {
+        if ((int) $hour > $since) $peak = max((int) $peak, (int) $value);
+    }
+    $out[$name] = [
+        'temp' => is_numeric($disk['temp'] ?? '') ? (int) $disk['temp'] : null,
+        'hot' => $limit('hotTemp', 'hot', 45),
+        'max' => $limit('maxTemp', 'max', 55),
+        'peak' => $peak,
+    ];
+}
+echo json_encode(['disks' => $out]);
+AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/include/docker-groups.php <<'AURORA_THEME_EOF'
 <?php
 // Application groups for the Docker tab, the VMs tab ("?type=vm") and the Dashboard.
@@ -7511,6 +7605,7 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/include/health.php <<'AURORA_THEME_
 //   GET          returns {"items": [{"tone": "danger|warn|info|ok", "title": "...", "detail": "...", "href": "/Main"}, ...],
 //                         "counts": {"danger": n, "warn": n}}
 //   GET ?counts  only {"counts": ...}, without the Docker check, for the top bar on every page
+//   GET ?list    every problem (danger, warn, info), not only four, for the top bar's problem list
 // Problems come first (danger, then warn, then info); "ok" items follow, so the list always
 // starts with the four most useful facts. Read-only: nothing is changed here.
 header('Content-Type: application/json');
@@ -7638,7 +7733,70 @@ if ($countsOnly) {
 
 $rank = ['danger' => 0, 'warn' => 1, 'info' => 2, 'ok' => 3];
 usort($items, function ($a, $b) use ($rank) { return $rank[$a['tone']] <=> $rank[$b['tone']]; });
+if (isset($_GET['list'])) {
+    echo json_encode(['items' => array_values(array_filter($items, function ($item) { return $item['tone'] !== 'ok'; })), 'counts' => $counts]);
+    exit;
+}
 echo json_encode(['items' => array_slice($items, 0, 4), 'counts' => $counts]);
+AURORA_THEME_EOF
+cat > /usr/local/emhttp/plugins/Aurora-Theme/include/jump.php <<'AURORA_THEME_EOF'
+<?php
+// Quick jump (Ctrl+K): everything worth jumping to, as {"items": [{"title", "group", "href"}, ...]}.
+// Pages come from the webGUI's own .page files; apps, VMs and shares from their state. Read-only.
+header('Content-Type: application/json');
+header('Cache-Control: no-store');
+
+$items = [];
+$add = function (string $title, string $group, string $href) use (&$items) {
+    $items[] = ['title' => $title, 'group' => $group, 'href' => $href];
+};
+
+// ---- Pages: a page's address is /<Tab>/<Name>, the tab being the ancestor listed under "Tasks" ----
+$pages = [];
+foreach (glob('/usr/local/emhttp/plugins/*/*.page') ?: [] as $file) {
+    $head = (string) @file_get_contents($file, false, null, 0, 4096);
+    $head = explode("\n---", $head, 2)[0];
+    preg_match('/^Menu="([^"]*)"/m', $head, $menu);
+    preg_match('/^Title="([^"]*)"/m', $head, $title);
+    $pages[basename($file, '.page')] = [
+        'parents' => array_values(array_filter(array_map(function ($part) { return strtok($part, ':'); }, preg_split('/\s+/', trim($menu[1] ?? ''))))),
+        'title' => trim($title[1] ?? ''),
+    ];
+}
+$tabOf = function (string $name) use ($pages): string {
+    $seen = [];
+    while (isset($pages[$name]) && !isset($seen[$name])) {
+        $seen[$name] = true;
+        $parents = $pages[$name]['parents'];
+        if (!$parents) return '';
+        if (in_array('Tasks', $parents, true)) return $name;
+        $name = $parents[0];
+    }
+    return '';
+};
+foreach ($pages as $name => $page) {
+    $title = $page['title'];
+    if ($title === '' || strpos($title, '$') !== false || strpos($title, '<') !== false || mb_strlen($title) > 50) continue;
+    if (!$page['parents'] || array_intersect($page['parents'], ['Buttons', 'xmenu'])) continue;
+    $tab = $tabOf($name);
+    if ($tab === '') continue;
+    $add($title, $tab === $name ? 'Tab' : $tab, $tab === $name ? "/$name" : "/$tab/$name");
+}
+
+// ---- Apps, VMs, shares ----
+if (is_executable('/usr/bin/docker')) {
+    exec("timeout 3 /usr/bin/docker ps -a --format '{{.Names}}' 2>/dev/null", $names, $code);
+    foreach ($code === 0 ? $names : [] as $name) $add($name, 'App', '/Docker');
+}
+if (is_executable('/usr/bin/virsh') && is_file('/var/run/libvirt/libvirtd.pid')) {
+    exec('timeout 3 /usr/bin/virsh list --all --name 2>/dev/null', $vms, $code);
+    foreach ($code === 0 ? array_filter(array_map('trim', $vms)) : [] as $vm) $add($vm, 'VM', '/VMs');
+}
+foreach (array_keys((array) @parse_ini_file('/var/local/emhttp/shares.ini', true)) as $share) {
+    $add((string) $share, 'Share', '/Shares/Share?name=' . rawurlencode((string) $share));
+}
+
+echo json_encode(['items' => $items]);
 AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/include/login-head.php <<'AURORA_THEME_EOF'
 <?php
@@ -7684,6 +7842,37 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/include/login-head.php <<'AURORA_TH
         . "  if (note && /logged out|abgemeldet/i.test(note.textContent)) note.classList.add('tp-ok');\n"
         . "});</script>\n";
 })();
+AURORA_THEME_EOF
+cat > /usr/local/emhttp/plugins/Aurora-Theme/include/ops.php <<'AURORA_THEME_EOF'
+<?php
+// Running long operations, for the top bar: {"ops": [{"title", "percent", "left", "href"}, ...]}.
+// percent and left (seconds) are null when not known. Read-only.
+header('Content-Type: application/json');
+header('Cache-Control: no-store');
+
+$ops = [];
+$var = (array) @parse_ini_file('/var/local/emhttp/var.ini');
+if (($var['mdState'] ?? '') === 'STARTED' && (int) ($var['mdResync'] ?? 0) > 0) {
+    $size = (float) ($var['mdResyncSize'] ?? 0);
+    $pos = (float) ($var['mdResyncPos'] ?? 0);
+    $dt = (float) ($var['mdResyncDt'] ?? 0);
+    $db = (float) ($var['mdResyncDb'] ?? 0);
+    $action = (string) ($var['mdResyncAction'] ?? '');
+    $title = strpos($action, 'recon') === 0 ? 'Rebuild' : (strpos($action, 'clear') === 0 ? 'Clearing' : 'Parity check');
+    $speed = $dt > 0 ? $db / $dt : 0; // KiB per second
+    $paused = $dt == 0 && $db == 0;
+    $ops[] = [
+        'title' => $title . ($paused ? ' paused' : ''),
+        'percent' => $size > 0 ? round($pos / $size * 100, 1) : null,
+        'left' => !$paused && $speed > 0 && $size > $pos ? (int) (($size - $pos) / $speed) : null,
+        'href' => '/Main',
+    ];
+}
+$pid = (int) @file_get_contents('/var/run/mover.pid');
+if ($pid > 0 && file_exists("/proc/$pid")) {
+    $ops[] = ['title' => 'Mover running', 'percent' => null, 'left' => null, 'href' => '/Main'];
+}
+echo json_encode(['ops' => $ops]);
 AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/include/plugin-recheck.php <<'AURORA_THEME_EOF'
 <?php
@@ -8091,6 +8280,26 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/collect.php <<'AURORA_THEME
 <?php
 // Run by cron once a minute: stores one history point for the Stats page.
 require __DIR__ . '/../include/StatsLib.php';
+
+// Hottest temperature per disk and hour, kept for a day, for include/disktemps.php. Recorded
+// even when the Stats history is off.
+(function () {
+    $file = '/var/lib/aurora-theme/disktemp.json';
+    if (!is_dir(dirname($file))) @mkdir(dirname($file), 0755, true);
+    $peaks = json_decode((string) @file_get_contents($file), true);
+    $peaks = is_array($peaks) ? $peaks : [];
+    $hour = (int) floor(time() / 3600);
+    foreach ((array) @parse_ini_file('/var/local/emhttp/disks.ini', true) as $key => $disk) {
+        if (!is_array($disk) || !is_numeric($disk['temp'] ?? '')) continue;
+        $name = strtolower((string) ($disk['name'] ?? $key));
+        $peaks[$name][$hour] = max((int) ($peaks[$name][$hour] ?? 0), (int) $disk['temp']);
+    }
+    foreach ($peaks as $name => $hours) {
+        $peaks[$name] = array_filter((array) $hours, function ($h) use ($hour) { return (int) $h > $hour - 25; }, ARRAY_FILTER_USE_KEY);
+        if (!$peaks[$name]) unset($peaks[$name]);
+    }
+    @file_put_contents($file, json_encode($peaks), LOCK_EX);
+})();
 
 if (!tft_stats_enabled()) {
     exit(0);
@@ -12533,9 +12742,404 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
     scan();
   }
 
+  const OPTIONS = window.auroraOptions || {};
+
+  function getJson(path) {
+    return fetch(PLUGIN_BASE + path, { credentials: 'same-origin', cache: 'no-store' }).then(function (response) {
+      if (!response.ok) throw new Error(path + ' failed with status ' + response.status);
+      return response.json();
+    });
+  }
+
+  // Every page: Ctrl+K (⌘K) or "/" opens a search over pages, settings, apps, VMs and shares
+  // (include/jump.php, loaded on first use, plus the menu's own tabs). Arrows pick, Enter opens.
+  function quickJump() {
+    if (OPTIONS.quickJump === false) return;
+    let items = null;
+    let open = null;
+
+    function load() {
+      if (items) return Promise.resolve(items);
+      const menu = [...document.querySelectorAll('#menu a[href^="/"]')].map(function (link) {
+        return { title: link.textContent.trim(), group: 'Tab', href: link.getAttribute('href') };
+      }).filter(function (item) { return item.title; });
+      return getJson('/include/jump.php').then(function (data) { return data.items || []; }, function (error) {
+        console.error('Aurora Theme quick jump:', error);
+        return [];
+      }).then(function (found) {
+        const seen = new Set();
+        items = menu.concat(found).filter(function (item) {
+          const key = item.title.toLowerCase() + '|' + item.href;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        return items;
+      });
+    }
+
+    function show() {
+      if (open) return;
+      const previousFocus = document.activeElement;
+      const backdrop = element('div', 'tp-modal-backdrop tp-jump-backdrop');
+      const box = element('div', 'tp-jump');
+      box.setAttribute('role', 'dialog');
+      box.setAttribute('aria-modal', 'true');
+      box.setAttribute('aria-label', 'Quick jump');
+      const input = element('input', 'tp-jump-input');
+      input.type = 'search';
+      input.placeholder = 'Jump to a page, setting, app, VM or share…';
+      input.setAttribute('aria-label', input.placeholder);
+      input.setAttribute('aria-controls', 'tp-jump-list');
+      const list = element('ul', 'tp-jump-list');
+      list.id = 'tp-jump-list';
+      list.setAttribute('role', 'listbox');
+      const hint = element('p', 'tp-jump-hint', '↑ ↓ to choose · Enter to open · Esc to close');
+      box.append(input, list, hint);
+      backdrop.append(box);
+      document.body.append(backdrop);
+      input.focus();
+      let shown = [];
+      let active = 0;
+
+      function close() {
+        backdrop.remove();
+        document.removeEventListener('keydown', onKey, true);
+        open = null;
+        if (previousFocus && previousFocus.focus) previousFocus.focus();
+      }
+      function go(item) {
+        if (item) location.href = item.href;
+      }
+      function render() {
+        const query = input.value.trim().toLowerCase();
+        const all = items || [];
+        shown = (query ? all.filter(function (item) { return item.title.toLowerCase().includes(query) || item.group.toLowerCase() === query; }) : all.filter(function (item) { return item.group === 'Tab'; }))
+          .sort(function (a, b) { return query ? (b.title.toLowerCase().startsWith(query) ? 1 : 0) - (a.title.toLowerCase().startsWith(query) ? 1 : 0) : 0; })
+          .slice(0, 12);
+        active = Math.min(active, Math.max(shown.length - 1, 0));
+        list.replaceChildren(...shown.map(function (item, index) {
+          const row = element('li', 'tp-jump-item' + (index === active ? ' tp-active' : ''));
+          row.setAttribute('role', 'option');
+          row.setAttribute('aria-selected', index === active ? 'true' : 'false');
+          row.append(element('span', 'tp-jump-title', item.title), element('span', 'tp-jump-group', item.group));
+          row.addEventListener('mousedown', function (event) { event.preventDefault(); go(item); });
+          return row;
+        }));
+        if (!shown.length) list.append(element('li', 'tp-jump-empty', items ? 'Nothing found' : 'Loading…'));
+      }
+      function onKey(event) {
+        if (event.key === 'Escape') { event.preventDefault(); close(); }
+        else if (event.key === 'ArrowDown') { event.preventDefault(); active = Math.min(active + 1, shown.length - 1); render(); }
+        else if (event.key === 'ArrowUp') { event.preventDefault(); active = Math.max(active - 1, 0); render(); }
+        else if (event.key === 'Enter') { event.preventDefault(); go(shown[active]); }
+      }
+      input.addEventListener('input', function () { active = 0; render(); });
+      backdrop.addEventListener('mousedown', function (event) { if (event.target === backdrop) close(); });
+      document.addEventListener('keydown', onKey, true);
+      open = close;
+      render();
+      load().then(render);
+    }
+
+    document.addEventListener('keydown', function (event) {
+      const typing = event.target.closest && event.target.closest('input, textarea, select, [contenteditable="true"], .CodeMirror');
+      if ((event.key === 'k' || event.key === 'K') && (event.ctrlKey || event.metaKey) && !event.altKey) {
+        event.preventDefault();
+        if (open) open(); else show();
+      } else if (event.key === '/' && !typing && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        show();
+      }
+    });
+    const crumb = document.querySelector('#header .tp-crumb');
+    if (crumb && !crumb.querySelector('.tp-jump-button')) {
+      const mac = /Mac|iPhone|iPad/.test(navigator.platform || '');
+      crumb.append(iconButton('search', 'Quick jump (' + (mac ? '⌘K' : 'Ctrl+K') + ')', show, 'tp-jump-button'));
+    }
+  }
+
+  // Top bar, every page: a parity check, rebuild or the mover, with how far it is and the time
+  // left (include/ops.php). Checked every 15 seconds while something runs, else every minute.
+  function opsPill() {
+    if (OPTIONS.opsPill === false) return;
+    const crumb = document.querySelector('#header .tp-crumb');
+    if (!crumb || crumb.querySelector('.tp-ops-pill')) return;
+    const pill = element('a', 'tp-ops-pill');
+    pill.href = '/Main';
+    pill.hidden = true;
+    crumb.append(pill);
+    let failures = 0;
+    function left(seconds) {
+      if (seconds == null) return '';
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.max(1, Math.round((seconds % 3600) / 60));
+      return (hours ? hours + ' h ' : '') + minutes + ' min left';
+    }
+    function load() {
+      if (document.hidden) return setTimeout(load, 60000);
+      getJson('/include/ops.php').then(function (data) {
+        failures = 0;
+        const ops = data.ops || [];
+        pill.hidden = !ops.length;
+        const text = ops.map(function (op) {
+          return [op.title, op.percent != null ? op.percent + '%' : '', left(op.left)].filter(Boolean).join(' · ');
+        }).join('  |  ');
+        pill.textContent = '';
+        if (ops.length) {
+          pill.append(element('i', 'fa fa-refresh tp-ops-spin'), document.createTextNode(' ' + text));
+          const percent = ops[0].percent;
+          pill.style.setProperty('--tp-ops', percent != null ? percent + '%' : '0%');
+          pill.title = text;
+        }
+        setTimeout(load, ops.length ? 15000 : 60000);
+      }).catch(function (error) {
+        if (++failures >= 3) return console.error('Aurora Theme operations:', error);
+        setTimeout(load, 60000);
+      });
+    }
+    load();
+  }
+
+  // Top bar: clicking the problem count lists every problem with a link to it (health.php?list).
+  function problemList() {
+    const pill = document.querySelector('#header .tp-alert-pill');
+    if (!pill || pill.tpList) return;
+    pill.tpList = true;
+    pill.setAttribute('aria-haspopup', 'dialog');
+    let panel = null;
+    function close() {
+      if (!panel) return;
+      panel.remove();
+      panel = null;
+      pill.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('mousedown', outside, true);
+      document.removeEventListener('keydown', onKey, true);
+    }
+    function outside(event) { if (panel && !panel.contains(event.target) && event.target !== pill) close(); }
+    function onKey(event) { if (event.key === 'Escape') { close(); pill.focus(); } }
+    pill.addEventListener('click', function (event) {
+      if (event.ctrlKey || event.metaKey || event.shiftKey) return;
+      event.preventDefault();
+      if (panel) return close();
+      panel = element('div', 'tp-problems');
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-label', 'Problems');
+      const list = element('ul', 'tp-problems-list');
+      list.append(element('li', 'tp-problems-empty', 'Loading…'));
+      panel.append(list);
+      const rect = pill.getBoundingClientRect();
+      panel.style.top = (rect.bottom + 6) + 'px';
+      panel.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 368)) + 'px';
+      document.body.append(panel);
+      pill.setAttribute('aria-expanded', 'true');
+      document.addEventListener('mousedown', outside, true);
+      document.addEventListener('keydown', onKey, true);
+      getJson('/include/health.php?list').then(function (data) {
+        if (!panel) return;
+        const items = data.items || [];
+        list.replaceChildren(...items.map(function (item) {
+          const row = element('li', 'tp-problem tp-problem-' + item.tone);
+          const link = element('a', 'tp-problem-link');
+          link.href = String(item.href || '/Dashboard').startsWith('/') ? item.href : '/Dashboard';
+          link.append(element('strong', '', String(item.title)), element('span', '', String(item.detail || '')));
+          row.append(link);
+          return row;
+        }));
+        if (!items.length) list.append(element('li', 'tp-problems-empty', 'No problems found.'));
+        const first = list.querySelector('a');
+        if (first) first.focus();
+      }).catch(function (error) {
+        console.error('Aurora Theme problem list:', error);
+        if (panel) list.replaceChildren(element('li', 'tp-problems-empty', 'Could not load the list.'));
+      });
+    });
+  }
+
+  // Main page and Dashboard: disk temperatures coloured against each disk's own limits (Unraid's
+  // per-disk warning and critical settings, else Display Settings), with the hottest reading of
+  // the last 24 hours as the tooltip (include/disktemps.php).
+  function diskTemps() {
+    const tables = [...document.querySelectorAll('table.disk_status')];
+    const dash = document.getElementById('db_box1') ? [...document.querySelectorAll('#db_box1, #db_box2, #db_box3')] : [];
+    if (!tables.length && !dash.length) return;
+    let disks = null;
+    const TEMP = /^(\d+(?:[.,]\d+)?)\s*°\s*([CF])$/;
+    function key(row) {
+      const first = row.querySelector('td');
+      if (!first) return '';
+      const link = first.querySelector('a');
+      return ((link || first).textContent.split('(')[0] || '').toLowerCase().replace(/\s+/g, '');
+    }
+    function apply(cell, row) {
+      const text = cell.textContent.trim();
+      const match = TEMP.exec(text);
+      const disk = disks && disks[key(row)];
+      if (!match || !disk) return;
+      const celsius = match[2] === 'F' ? (parseFloat(match[1]) - 32) * 5 / 9 : parseFloat(match[1]);
+      const level = disk.max > 0 && celsius >= disk.max ? 'hot' : disk.hot > 0 && celsius >= disk.hot ? 'warm' : 'ok';
+      const title = 'Warning at ' + disk.hot + ' °C, critical at ' + disk.max + ' °C' + (disk.peak != null ? ' · hottest in 24 h: ' + disk.peak + ' °C' : '');
+      if (cell.dataset.level !== level) cell.dataset.level = level;
+      if (cell.title !== title) cell.title = title;
+      if (!cell.classList.contains('tp-temp')) cell.classList.add('tp-temp');
+      if (!cell.querySelector('.tp-chip')) {
+        const chip = element('span', 'tp-chip', text);
+        cell.replaceChildren(chip);
+      }
+    }
+    function run() {
+      if (!disks) return;
+      tables.concat(dash).forEach(function (scope) {
+        scope.querySelectorAll('tr').forEach(function (row) {
+          row.querySelectorAll(':scope > td').forEach(function (cell) {
+            if (cell.classList.contains('tp-temp') || TEMP.test(cell.textContent.trim())) apply(cell, row);
+          });
+        });
+      });
+    }
+    const later = debounce(run, 300);
+    tables.concat(dash).forEach(function (scope) { new MutationObserver(later).observe(scope, { childList: true, subtree: true }); });
+    function load() {
+      if (!document.hidden) getJson('/include/disktemps.php').then(function (data) { disks = data.disks || {}; run(); }, function (error) { console.error('Aurora Theme disk temperatures:', error); });
+    }
+    load();
+    setInterval(load, 60000);
+  }
+
+  // Docker page: a small CPU and memory graph beside each running container's figures, from
+  // the values Unraid writes every few seconds (kept for the last three minutes, in this tab only).
+  function containerGraphs() {
+    const list = document.getElementById('docker_list');
+    if (!list || folderViewPlus()) return;
+    const history = new Map();
+    const SVG = 'http://www.w3.org/2000/svg';
+    const KEEP = 60;
+    function value(cell, kind) {
+      const text = cell.textContent.trim();
+      if (kind === 'cpu') return /^[\d.,]+%$/.test(text) ? parseFloat(text.replace(',', '.')) : null;
+      const parts = text.split('/');
+      const bytes = function (part) {
+        const match = String(part).trim().match(/^([\d.,]+)\s*([KMGT]?)i?B$/i);
+        return match ? parseFloat(match[1].replace(',', '.')) * Math.pow(1024, ' KMGT'.indexOf(match[2].toUpperCase() || ' ')) : 0;
+      };
+      const used = bytes(parts[0] || '');
+      const limit = bytes(parts[1] || '');
+      return limit > 0 ? used / limit * 100 : null;
+    }
+    function draw(cell, values, kind) {
+      let svg = cell.nextElementSibling;
+      if (!svg || !svg.classList || !svg.classList.contains('tp-spark')) {
+        svg = document.createElementNS(SVG, 'svg');
+        svg.setAttribute('class', 'tp-spark tp-spark-' + kind);
+        svg.setAttribute('viewBox', '0 0 60 16');
+        svg.setAttribute('preserveAspectRatio', 'none');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.append(document.createElementNS(SVG, 'polyline'));
+        cell.after(svg);
+      }
+      const top = kind === 'cpu' ? Math.max(5, Math.max.apply(null, values)) : 100;
+      const step = 60 / (KEEP - 1);
+      const start = KEEP - values.length;
+      svg.firstChild.setAttribute('points', values.map(function (v, i) { return ((start + i) * step).toFixed(1) + ',' + (15 - v / top * 14).toFixed(1); }).join(' '));
+    }
+    function sample() {
+      if (document.hidden) return;
+      list.querySelectorAll('[class^="cpu-"], [class^="mem-"]').forEach(function (cell) {
+        const kind = cell.className.startsWith('cpu-') ? 'cpu' : 'mem';
+        const v = value(cell, kind);
+        if (v == null || !cell.closest('tr') || !cell.closest('tr').querySelector('td.ct-name i.started')) return;
+        const name = cell.className.split(' ')[0];
+        const values = history.get(name) || [];
+        values.push(v);
+        if (values.length > KEEP) values.shift();
+        history.set(name, values);
+        if (values.length > 1) draw(cell, values, kind);
+      });
+    }
+    setInterval(sample, 3000);
+    sample();
+  }
+
+  // System log: errors and warnings stand out, and two buttons show only those lines. Unraid
+  // gives each line a span with its kind (error, warn, ...).
+  function logFilter() {
+    const box = [...document.querySelectorAll('pre, .syslog, #logs, #log')].find(function (node) {
+      return node.querySelector(':scope > span.error, :scope > span.warn, :scope > span.system, :scope > span.login, :scope > span.array');
+    });
+    if (!box || box.tpFilter) return;
+    box.tpFilter = true;
+    box.classList.add('tp-log');
+    const bar = element('div', 'tp-log-filter');
+    bar.setAttribute('role', 'group');
+    bar.setAttribute('aria-label', 'Show lines');
+    const modes = [['all', 'All lines'], ['errors', 'Errors'], ['warnings', 'Errors and warnings']];
+    const buttons = modes.map(function (mode) {
+      const button = element('button', 'tp-log-mode', mode[1]);
+      button.type = 'button';
+      button.dataset.mode = mode[0];
+      button.setAttribute('aria-pressed', mode[0] === 'all' ? 'true' : 'false');
+      button.addEventListener('click', function () { set(mode[0]); });
+      return button;
+    });
+    const count = element('span', 'tp-log-count');
+    bar.append(...buttons, count);
+    box.before(bar);
+    function set(mode) {
+      box.classList.toggle('tp-log-errors', mode === 'errors');
+      box.classList.toggle('tp-log-warnings', mode === 'warnings');
+      buttons.forEach(function (button) { button.setAttribute('aria-pressed', button.dataset.mode === mode ? 'true' : 'false'); });
+    }
+    function counts() {
+      const errors = box.querySelectorAll(':scope > span.error').length;
+      const warnings = box.querySelectorAll(':scope > span.warn').length;
+      count.textContent = errors + (errors === 1 ? ' error, ' : ' errors, ') + warnings + (warnings === 1 ? ' warning' : ' warnings');
+    }
+    new MutationObserver(debounce(counts, 500)).observe(box, { childList: true });
+    counts();
+  }
+
+  // Dark and light by themselves: following this computer's setting or a timetable. The switch
+  // is only pressed when that wish changes (remembered in this browser), so the sun / moon
+  // switch keeps working in between and two browsers do not fight over the server setting.
+  function autoTheme() {
+    const mode = OPTIONS.autoTheme;
+    if (mode !== 'system' && mode !== 'schedule') return;
+    const root = document.documentElement;
+    if (!root.classList.contains('Theme--black') && !root.classList.contains('Theme--white')) return;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    function minutes(text) { const parts = String(text).split(':'); return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10); }
+    function wanted() {
+      if (mode === 'system') return media.matches ? 'black' : 'white';
+      const now = new Date();
+      const at = now.getHours() * 60 + now.getMinutes();
+      const light = minutes(OPTIONS.lightAt);
+      const dark = minutes(OPTIONS.darkAt);
+      const day = light < dark ? at >= light && at < dark : at >= light || at < dark;
+      return day ? 'white' : 'black';
+    }
+    function check() {
+      let last;
+      try { last = localStorage.getItem('tp-autotheme'); } catch (error) { return; }
+      const want = mode + ':' + wanted();
+      if (last === want) return;
+      try { localStorage.setItem('tp-autotheme', want); } catch (error) { return; }
+      const current = root.classList.contains('Theme--black') ? 'black' : 'white';
+      const button = document.querySelector('.tp-theme-switch');
+      if (button && current !== wanted()) button.click();
+    }
+    media.addEventListener('change', check);
+    if (mode === 'schedule') setInterval(check, 60000);
+    // The switch is placed once Unraid's profile component has drawn.
+    setTimeout(check, 1500);
+  }
+
   function start() {
     const info = pageInfo();
-    [function () { topBar(info); }, alertPill, themeSwitch, function () { serverCard(info); }, function () { pageHeading(info); }, function () { folderViewBeta(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, sharesPage, selectLists, lockState, docker, dockerPorts, vmViewSwitch, vmGroups, vmDetails, mainTables, arrayOperations, dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardUpdates, dockerUpdateWatch, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, diskLocationBays, sectionRows, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
+    // The Dashboard's enhancers are skipped elsewhere without each looking for its tiles.
+    const onDashboard = Boolean(document.getElementById('db_box1'));
+    const dashboardOnly = new Set([dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardUpdates, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans]);
+    [function () { topBar(info); }, alertPill, problemList, opsPill, quickJump, themeSwitch, autoTheme, function () { serverCard(info); }, function () { pageHeading(info); }, function () { folderViewBeta(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, sharesPage, selectLists, lockState, docker, dockerPorts, containerGraphs, logFilter, vmViewSwitch, vmGroups, vmDetails, mainTables, diskTemps, arrayOperations, dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardUpdates, dockerUpdateWatch, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, diskLocationBays, sectionRows, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
+      if (!onDashboard && dashboardOnly.has(enhancer)) return;
       // One failing enhancer must not stop the others or the page's own scripts.
       try { enhancer(); } catch (error) { console.error('Aurora Theme:', error); }
     });
@@ -17606,6 +18210,129 @@ tbody.tp-cpu-tile > tr.tp-core-pair .usage-disk {
         padding-top: 0 !important;
     }
 }
+
+/* ---- Quick jump, Ctrl+K (quickJump) ---- */
+.tp-jump-backdrop { place-items: start center; padding-top: 12vh; }
+.tp-jump {
+    width: min(56rem, 100%);
+    border: 1px solid var(--tp-border, var(--border-color));
+    border-radius: 14px;
+    background-color: var(--tp-elevated, var(--background-color));
+    color: var(--tp-text, inherit);
+    box-shadow: var(--tp-shadow-lg, 0 20px 50px rgba(0, 0, 0, 0.4));
+    overflow: hidden;
+}
+.tp-jump-input {
+    box-sizing: border-box;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 1.4rem 1.6rem !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--tp-border, var(--border-color)) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: inherit !important;
+    font-size: 1.6rem !important;
+}
+.tp-jump-input:focus { outline: none; }
+.tp-jump-list { margin: 0; padding: 0.6rem; list-style: none; max-height: 50vh; overflow-y: auto; }
+.tp-jump-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.8rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.tp-jump-item.tp-active, .tp-jump-item:hover { background-color: var(--tp-primary-soft, rgba(59, 130, 246, 0.15)); }
+.tp-jump-group { color: var(--tp-muted, var(--alt-text-color)); font-size: 1.2rem; }
+.tp-jump-empty { padding: 1rem; color: var(--tp-muted, var(--alt-text-color)); }
+.tp-jump-hint { margin: 0; padding: 0.7rem 1.6rem; border-top: 1px solid var(--tp-border, var(--border-color)); color: var(--tp-muted, var(--alt-text-color)); font-size: 1.15rem; }
+.tp-jump-button { margin-left: 0.6rem; }
+
+/* ---- Long operations in the top bar (opsPill) ---- */
+.tp-ops-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: 0.8rem;
+    padding: 0.2rem 0.9rem;
+    border: 1px solid var(--tp-primary, #3b82f6);
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--tp-primary-soft, rgba(59, 130, 246, 0.2)) var(--tp-ops, 0%), transparent var(--tp-ops, 0%));
+    color: var(--tp-primary-text, var(--tp-primary, #3b82f6)) !important;
+    font-size: 1.2rem;
+    font-weight: 600;
+    text-decoration: none !important;
+    white-space: nowrap;
+}
+.tp-ops-pill[hidden] { display: none; }
+.tp-ops-spin { animation: tp-ops-spin 2s linear infinite; }
+@keyframes tp-ops-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .tp-ops-spin { animation: none; } }
+@media (max-width: 640px) { .tp-ops-pill { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; } }
+
+/* ---- Problem list under the problem count (problemList) ---- */
+.tp-problems {
+    position: fixed;
+    z-index: 100000;
+    width: min(36rem, calc(100vw - 16px));
+    border: 1px solid var(--tp-border, var(--border-color));
+    border-radius: 12px;
+    background-color: var(--tp-elevated, var(--background-color));
+    box-shadow: var(--tp-shadow-lg, 0 12px 30px rgba(0, 0, 0, 0.35));
+}
+.tp-problems-list { margin: 0; padding: 0.6rem; list-style: none; max-height: 60vh; overflow-y: auto; }
+.tp-problem-link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.8rem 1rem 0.8rem 1.2rem;
+    border-left: 3px solid var(--tp-muted, #888);
+    border-radius: 6px;
+    color: var(--tp-text, inherit) !important;
+    text-decoration: none !important;
+}
+.tp-problem-link:hover, .tp-problem-link:focus-visible { background-color: var(--tp-subtle, rgba(127, 127, 127, 0.1)); }
+.tp-problem-link span { color: var(--tp-muted, var(--alt-text-color)); font-size: 1.2rem; }
+.tp-problem-danger .tp-problem-link { border-left-color: var(--tp-danger, #ef4444); }
+.tp-problem-warn .tp-problem-link { border-left-color: var(--tp-warn-text, #f59e0b); }
+.tp-problem-info .tp-problem-link { border-left-color: var(--tp-primary, #3b82f6); }
+.tp-problems-empty { padding: 1rem; color: var(--tp-muted, var(--alt-text-color)); }
+
+/* ---- Container graphs on the Docker page (containerGraphs) ---- */
+.tp-spark { display: inline-block; width: 4.8rem; height: 1.4rem; margin-left: 0.5rem; vertical-align: middle; overflow: visible; }
+.tp-spark polyline { fill: none; stroke-width: 1.5; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.tp-spark-cpu polyline { stroke: var(--tp-primary, #3b82f6); }
+.tp-spark-mem polyline { stroke: var(--tp-muted, #94a3b8); }
+
+/* ---- System log (logFilter): errors and warnings stand out; filters hide the rest ---- */
+.tp-log-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin: 0 0 0.8rem; }
+.tp-log-mode {
+    margin: 0 !important;
+    padding: 0.4rem 1rem !important;
+    border: 1px solid var(--tp-border, var(--border-color)) !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+    color: var(--tp-text, inherit) !important;
+    font-size: 1.2rem !important;
+    text-transform: none !important;
+}
+.tp-log-mode[aria-pressed="true"] { border-color: var(--tp-primary, #3b82f6) !important; background-color: var(--tp-primary-soft, rgba(59, 130, 246, 0.15)) !important; }
+.tp-log-count { color: var(--tp-muted, var(--alt-text-color)); font-size: 1.2rem; }
+.tp-log > span.error { color: var(--tp-danger, #ef4444) !important; font-weight: 600; }
+.tp-log > span.warn { color: var(--tp-warn-text, #f59e0b) !important; }
+.tp-log.tp-log-errors, .tp-log.tp-log-warnings { font-size: 0 !important; }
+.tp-log.tp-log-errors > span, .tp-log.tp-log-warnings > span { display: none; }
+.tp-log.tp-log-errors > span.error,
+.tp-log.tp-log-warnings > span.error,
+.tp-log.tp-log-warnings > span.warn { display: block; font-size: 1.3rem; }
+
+/* ---- Table density: compact (Settings > Aurora Theme) ---- */
+:root.tp-compact table td, :root.tp-compact table th { padding-top: 0.35rem !important; padding-bottom: 0.35rem !important; }
+:root.tp-compact table tbody tr { height: auto !important; }
+:root.tp-compact .tp-chip, :root.tp-compact .tp-pill { padding-top: 0.05rem; padding-bottom: 0.05rem; }
 AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/styles/layout-sidebar.css <<'AURORA_THEME_EOF'
 /*
@@ -25916,7 +26643,7 @@ cat > /boot/config/plugins/Aurora-Theme/stats.cron <<'AURORA_THEME_EOF'
 AURORA_THEME_EOF
 /usr/bin/php /usr/local/emhttp/plugins/Aurora-Theme/scripts/schedule.php
 echo ""
-echo "Aurora-Theme 2026.10.31.1233 is installed."
+echo "Aurora-Theme 2026.10.31.1521 is installed."
 echo "Settings: Settings > User Utilities > Aurora Theme"
 echo ""
 ]]>
