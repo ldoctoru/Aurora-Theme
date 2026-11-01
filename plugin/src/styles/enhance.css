@@ -4655,12 +4655,10 @@ tbody.tp-cpu-tile > tr.tp-core-pair span.w36[data-level="hot"] .usage-disk > spa
     z-index: 2;
     display: flex;
     gap: 0.3rem;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.15s;
+    visibility: hidden;
 }
 #docker_view span.outer.apps:hover > .tp-chip-actions,
-#docker_view span.outer.apps:focus-within > .tp-chip-actions { opacity: 1; pointer-events: auto; }
+#docker_view span.outer.apps:focus-within > .tp-chip-actions { visibility: visible; }
 .tp-chip-action {
     display: grid;
     place-items: center;
