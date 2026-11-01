@@ -4227,34 +4227,43 @@ td[data-level="hot"] > .tp-core-avg { color: var(--tp-danger, #ef4444); }
 tbody.tp-cpu-tile > tr.tp-core-pair > td[data-level="hot"] { border-color: color-mix(in srgb, var(--tp-danger, #ef4444) 45%, var(--tp-border)); }
 
 tbody.tp-cpu-tile > tr.tp-core-pair span.w36 {
-    display: flex !important;
+    display: grid !important;
+    grid-template-columns: 4.2rem minmax(0, 1fr) 3.8rem;
     align-items: center;
-    gap: 0.6rem;
+    column-gap: 0.6rem;
     width: auto !important;
+    max-width: none !important;
     margin: 0 !important;
 }
-tbody.tp-cpu-tile > tr.tp-core-pair span.w36:nth-of-type(2) { grid-area: t1; }
-tbody.tp-cpu-tile > tr.tp-core-pair span.w36:nth-of-type(3) { grid-area: t2; }
+/* Placed by class (set in enhance.js), not by position: the average sits between the spans. */
+tbody.tp-cpu-tile > tr.tp-core-pair span.w36.tp-t1 { grid-area: t1; }
+tbody.tp-cpu-tile > tr.tp-core-pair span.w36.tp-t2 { grid-area: t2; }
 
 .tp-thread {
-    flex: none;
-    order: 0;
-    min-width: 2.2rem;
+    grid-area: auto !important;
+    grid-column: 1;
+    grid-row: 1;
     color: var(--tp-muted);
     font: 600 1.05rem/1 var(--tp-font-heading);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
-tbody.tp-cpu-tile > tr.tp-core-pair .usage-disk {
-    flex: 1;
-    order: 1;
+tbody.tp-cpu-tile > tr.tp-core-pair span.w36 .usage-disk {
+    display: block !important;
+    grid-area: auto !important;
+    grid-column: 2;
+    grid-row: 1;
+    width: 100% !important;
     height: 0.45rem !important;
 }
 
-tbody.tp-cpu-tile > tr.tp-core-pair .load {
-    flex: none;
-    order: 2;
-    min-width: 3.6rem;
+tbody.tp-cpu-tile > tr.tp-core-pair span.w36 .load {
+    display: block !important;
+    grid-area: auto !important;
+    grid-column: 3;
+    grid-row: 1;
+    width: auto !important;
     color: var(--tp-muted) !important;
     font-size: 1.1rem;
     text-align: right;
