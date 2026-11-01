@@ -2478,8 +2478,10 @@
       const cell = label.parentElement;
       cell.insertBefore(average, label.nextSibling);
       const threads = [...row.querySelectorAll('span.w36')];
-      [match[1], match[3]].forEach(function (number, index) {
-        if (threads[index]) threads[index].prepend(element('span', 'tp-thread', number));
+      ['CPU ' + match[1], 'HT ' + match[3]].forEach(function (text, index) {
+        if (!threads[index]) return;
+        threads[index].classList.add('tp-t' + (index + 1));
+        threads[index].prepend(element('span', 'tp-thread', text));
       });
       const levelOf = function (value) { return value >= 90 ? 'hot' : value >= 70 ? 'warm' : 'ok'; };
       const update = function () {
@@ -2493,7 +2495,7 @@
         const text = mean + '%';
         if (average.textContent !== text) average.textContent = text;
         if (cell.dataset.level !== levelOf(mean)) cell.dataset.level = levelOf(mean);
-        row.title = full + ': thread ' + match[1] + ' ' + values[0] + '%, thread ' + match[3] + ' ' + values[1] + '%';
+        row.title = full + ': CPU ' + match[1] + ' ' + values[0] + '%, HT ' + match[3] + ' ' + values[1] + '%';
       };
       threads.forEach(function (thread) {
         const load = thread.querySelector('.load');
