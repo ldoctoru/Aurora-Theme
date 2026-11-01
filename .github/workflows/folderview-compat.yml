@@ -1,24 +1,23 @@
 name: FolderView compatibility
 
 # Runs Aurora against the real FolderView Plus and FolderView3 pages (plugin/test/*_compat.mjs):
-# on changes to the theme or the checks, every Monday against both plugins' newest code (so a
+# on pull requests that change the theme or the checks (not again after the merge), every Monday against both plugins' newest code (so a
 # change on their side shows up without a change here), and on demand.
 on:
-  push:
-    branches: [dev, main]
-    paths:
-      - 'unraid-tapeory.css'
-      - 'plugin/src/**'
-      - 'plugin/test/**'
-      - '.github/workflows/folderview-compat.yml'
   pull_request:
     paths:
+      - '.github/workflows/folderview-compat.yml'
       - 'unraid-tapeory.css'
       - 'plugin/src/**'
       - 'plugin/test/**'
   schedule:
     - cron: '17 4 * * 1'
   workflow_dispatch:
+
+# A new commit on a pull request stops that pull request's unfinished run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

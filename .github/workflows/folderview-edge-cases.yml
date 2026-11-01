@@ -5,21 +5,20 @@ name: FolderView edge cases
 # VMs, Dashboard, settings pages). On changes to the theme or the checks, every Monday against
 # the newest code of Unraid 7.3 and both plugins, and on demand.
 on:
-  push:
-    branches: [dev, main]
-    paths:
-      - 'unraid-tapeory.css'
-      - 'plugin/src/**'
-      - 'plugin/test/unraid-sim/**'
-      - '.github/workflows/folderview-edge-cases.yml'
   pull_request:
     paths:
+      - '.github/workflows/folderview-edge-cases.yml'
       - 'unraid-tapeory.css'
       - 'plugin/src/**'
       - 'plugin/test/unraid-sim/**'
   schedule:
     - cron: '37 4 * * 1'
   workflow_dispatch:
+
+# A new commit on a pull request stops that pull request's unfinished run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
