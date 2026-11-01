@@ -4678,6 +4678,7 @@ tbody.tp-cpu-tile > tr.tp-core-pair span.w36[data-level="hot"] .usage-disk > spa
     font-size: 1.2rem !important;
 }
 .tp-chip-action:hover, .tp-chip-action:focus-visible { color: var(--tp-primary, #4f8bff) !important; border-color: var(--tp-primary, #4f8bff) !important; }
+.tp-chip-action.tp-chip-update { color: var(--tp-warn-text, var(--orange-300)) !important; }
 @media (hover: none) { .tp-chip-actions { display: none; } }
 
 /* ---- Main page: days until full (diskForecast) ---- */
