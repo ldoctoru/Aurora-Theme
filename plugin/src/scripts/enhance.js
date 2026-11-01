@@ -4921,7 +4921,8 @@
   }
 
 
-  // Dashboard, Docker tile: hovering a running app shows Restart and Logs buttons on its chip,
+  // Dashboard, Docker tile: hovering an app shows Update (when one is ready), and for a running
+  // app Restart and Logs, on its chip,
   // so the common actions need no menu. Unraid redraws the chips; the buttons are put back.
   function dashboardAppActions() {
     const view = document.getElementById('docker_view');
@@ -4931,11 +4932,21 @@
         if (chip.querySelector(':scope > .tp-chip-actions')) return;
         const trigger = chip.querySelector(':scope > span.hand[onclick*="addDockerContainerContext"]');
         const args = contextArguments(trigger);
-        if (args.length < 11 || args[3] !== '1') return;
+        if (args.length < 11) return;
+        const running = args[3] === '1';
+        const hasUpdate = args[5] === '1';
+        if (!running && !hasUpdate) return;
         const name = args[0];
         const id = args[10];
         const bar = element('span', 'tp-chip-actions');
-        bar.append(
+        if (hasUpdate) {
+          bar.append(iconButton('cloud-download', 'Update ' + name, function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof window.updateContainer === 'function') window.updateContainer(name);
+          }, 'tp-chip-action tp-chip-update'));
+        }
+        if (running) bar.append(
           iconButton('refresh', 'Restart ' + name, function (event) {
             event.preventDefault();
             event.stopPropagation();
