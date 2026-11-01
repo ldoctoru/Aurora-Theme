@@ -9,6 +9,8 @@ $aurora = parse_plugin_cfg('Aurora-Theme');
 <form markdown="1" method="POST" action="/update.php" target="progressFrame">
 <input type="hidden" name="#file" value="Aurora-Theme/Aurora-Theme.cfg">
 
+<div class="title"><span class="left"><i class="fa fa-paint-brush title"></i>_(Look)_</span></div>
+
 _(Colours and fonts)_:
 : <select name="theme">
   <?=mk_option($aurora['theme'], "yes", _("Enabled"))?>
@@ -74,6 +76,30 @@ _(Navigation layout)_:
 > Moves the main menu into a sidebar on screens at least 1024 pixels wide. Needs a top-navigation
 > Dynamix theme (Black or White).
 
+_(Table density)_:
+: <select name="density">
+  <?=mk_option($aurora['density'] ?? 'comfortable', "comfortable", _("Comfortable"))?>
+  <?=mk_option($aurora['density'] ?? 'comfortable', "compact", _("Compact"))?>
+  </select>
+
+> Compact uses less space between table rows, so more disks, apps and shares fit on screen.
+
+_(Automatic dark and light)_:
+: <select name="autotheme">
+  <?=mk_option($aurora['autotheme'] ?? 'off', "off", _("Off: only the sun / moon switch"))?>
+  <?=mk_option($aurora['autotheme'] ?? 'off', "system", _("Follow this computer's setting"))?>
+  <?=mk_option($aurora['autotheme'] ?? 'off', "schedule", _("On a timetable"))?>
+  </select>
+
+_(Light from / dark from)_:
+: <input type="time" name="autotheme_light" value="<?=htmlspecialchars($aurora['autotheme_light'] ?? '07:00')?>"> <input type="time" name="autotheme_dark" value="<?=htmlspecialchars($aurora['autotheme_dark'] ?? '19:00')?>">
+
+> The theme is a server setting, so it changes for every browser. It is only switched when your
+> computer's setting changes or a time on the timetable passes, so the sun / moon switch still
+> works in between. Needs the Black or White Dynamix theme.
+
+<div class="title"><span class="left"><i class="fa fa-window-maximize title"></i>_(Top bar and pages)_</span></div>
+
 _(Page enhancements)_:
 : <select name="enhance">
   <?=mk_option($aurora['enhance'], "yes", _("Enabled"))?>
@@ -108,27 +134,7 @@ _(Long operations in the top bar)_:
 > While a parity check, rebuild or the mover runs, a pill in the top bar shows how far it is and
 > the time left, on every page.
 
-_(Table density)_:
-: <select name="density">
-  <?=mk_option($aurora['density'] ?? 'comfortable', "comfortable", _("Comfortable"))?>
-  <?=mk_option($aurora['density'] ?? 'comfortable', "compact", _("Compact"))?>
-  </select>
-
-> Compact uses less space between table rows, so more disks, apps and shares fit on screen.
-
-_(Automatic dark and light)_:
-: <select name="autotheme">
-  <?=mk_option($aurora['autotheme'] ?? 'off', "off", _("Off: only the sun / moon switch"))?>
-  <?=mk_option($aurora['autotheme'] ?? 'off', "system", _("Follow this computer's setting"))?>
-  <?=mk_option($aurora['autotheme'] ?? 'off', "schedule", _("On a timetable"))?>
-  </select>
-
-_(Light from / dark from)_:
-: <input type="time" name="autotheme_light" value="<?=htmlspecialchars($aurora['autotheme_light'] ?? '07:00')?>"> <input type="time" name="autotheme_dark" value="<?=htmlspecialchars($aurora['autotheme_dark'] ?? '19:00')?>">
-
-> The theme is a server setting, so it changes for every browser. It is only switched when your
-> computer's setting changes or a time on the timetable passes, so the sun / moon switch still
-> works in between. Needs the Black or White Dynamix theme.
+<div class="title"><span class="left"><i class="fa fa-th-large title"></i>_(Dashboard)_</span></div>
 
 _(Dashboard app tiles)_:
 : <select name="apptiles">
@@ -160,6 +166,8 @@ _(Stats page)_:
 > Adds a Stats tab with processor, memory, network and disk charts, and records one measurement
 > per minute for it. It replaces the Dynamix System Statistics plugin; remove that plugin first,
 > because both use the name "Stats" for their tab.
+
+<div class="title"><span class="left"><i class="fa fa-refresh title"></i>_(Updates)_</span></div>
 
 _(Update channel)_:
 : <select name="channel">

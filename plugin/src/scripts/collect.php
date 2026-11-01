@@ -23,6 +23,43 @@ require __DIR__ . '/../include/StatsLib.php';
     @file_put_contents($file, json_encode($peaks), LOCK_EX);
 })();
 
+// Daily used space per disk and the server's starts, on the flash drive so they survive a
+// reboot; each is written at most once a day (usage) or once an hour (starts).
+(function () {
+    $dir = '/boot/config/plugins/Aurora-Theme';
+    if (!is_dir($dir)) return;
+
+    $file = "$dir/diskusage.json";
+    $today = date('Y-m-d');
+    $usage = json_decode((string) @file_get_contents($file), true);
+    $usage = is_array($usage) ? $usage : [];
+    $changed = false;
+    foreach ((array) @parse_ini_file('/var/local/emhttp/disks.ini', true) as $key => $disk) {
+        if (!is_array($disk) || !is_numeric($disk['fsSize'] ?? '') || (float) $disk['fsSize'] <= 0 || !is_numeric($disk['fsFree'] ?? '')) continue;
+        $name = strtolower((string) ($disk['name'] ?? $key));
+        if (isset($usage[$name][$today])) continue;
+        $usage[$name][$today] = (float) $disk['fsSize'] - (float) $disk['fsFree'];
+        $usage[$name] = array_slice($usage[$name], -30, null, true);
+        $changed = true;
+    }
+    if ($changed) @file_put_contents($file, json_encode($usage), LOCK_EX);
+
+    $file = "$dir/boots.json";
+    if (!preg_match('/^btime\s+(\d+)/m', (string) @file_get_contents('/proc/stat'), $m)) return;
+    $boot = (int) $m[1];
+    $boots = json_decode((string) @file_get_contents($file), true);
+    $boots = is_array($boots) ? $boots : [];
+    $last = end($boots);
+    // btime can move by a second between reads; within a minute it is the same start.
+    if (!$last || abs((int) $last['boot'] - $boot) > 60) {
+        $boots[] = ['boot' => $boot, 'seen' => time()];
+        @file_put_contents($file, json_encode(array_slice($boots, -10)), LOCK_EX);
+    } elseif (time() - (int) $last['seen'] >= 3600) {
+        $boots[count($boots) - 1]['seen'] = time();
+        @file_put_contents($file, json_encode($boots), LOCK_EX);
+    }
+})();
+
 if (!tft_stats_enabled()) {
     exit(0);
 }

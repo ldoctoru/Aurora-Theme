@@ -2367,6 +2367,7 @@
 
     // Captured before Unraid's own handler, which would open the small context menu instead.
     view.addEventListener('click', function (event) {
+      if (event.target.closest('.tp-chip-actions')) return;
       const chip = event.target.closest('span.outer.apps');
       if (!chip || event.button !== 0 || menuClick) return;
       const id = plus ? '' : folderId(chip);
@@ -2459,6 +2460,7 @@
       const match = full.match(/^CPU\s+(\d+)\s*(\([^)]*\))?\s*(?:-\s*HT\s+(\d+))?/);
       if (!match) return;
       row.title = full;
+      row.dataset.cpus = [match[1], match[3]].filter(Boolean).join(',');
       label.textContent = match[1] + (match[3] ? ' · ' + match[3] : '');
       if (match[2]) {
         const type = match[2].replace(/[()]/g, '').trim();
@@ -2503,6 +2505,28 @@
       });
       update();
     });
+
+    // Who is pinned to each core (include/pinning.php): a line under the core with the VMs and
+    // apps, and a mark on isolated threads, so a core that is always busy explains itself.
+    getJson('/include/pinning.php').then(function (data) {
+      const pins = data.pins || {};
+      const isolated = (data.isolated || []).map(String);
+      tile.querySelectorAll('tr.tp-core[data-cpus]').forEach(function (row) {
+        const cpus = row.dataset.cpus.split(',');
+        const owners = [];
+        cpus.forEach(function (cpu) { (pins[cpu] || []).forEach(function (owner) { if (!owners.includes(owner)) owners.push(owner); }); });
+        const cell = row.querySelector(':scope > td');
+        if (!cell || cell.querySelector('.tp-core-pin')) return;
+        const iso = cpus.filter(function (cpu) { return isolated.includes(cpu); });
+        if (!owners.length && !iso.length) return;
+        const note = element('span', 'tp-core-pin');
+        const text = (owners.length ? owners.join(', ') : '') + (iso.length ? (owners.length ? ' · ' : '') + 'isolated' : '');
+        note.append(element('i', 'fa fa-thumb-tack'), document.createTextNode(' ' + text));
+        note.title = 'Pinned to CPU ' + cpus.join(' and ') + ': ' + (owners.join(', ') || 'nothing') + (iso.length ? '. Isolated from Unraid: ' + iso.join(', ') : '');
+        cell.append(note);
+        row.classList.add('tp-core-pinned');
+      });
+    }, function (error) { console.error('Aurora Theme CPU pinning:', error); });
   }
 
   // Dashboard, System tile: Unraid draws its four rings in grey from a colour list in the page
@@ -4896,9 +4920,211 @@
     setTimeout(check, 1500);
   }
 
+
+  // Dashboard, Docker tile: hovering a running app shows Restart and Logs buttons on its chip,
+  // so the common actions need no menu. Unraid redraws the chips; the buttons are put back.
+  function dashboardAppActions() {
+    const view = document.getElementById('docker_view');
+    if (!view || typeof window.eventControl !== 'function') return;
+    function decorate() {
+      view.querySelectorAll('span.outer.apps:not([class*="folder-"])').forEach(function (chip) {
+        if (chip.querySelector(':scope > .tp-chip-actions')) return;
+        const trigger = chip.querySelector(':scope > span.hand[onclick*="addDockerContainerContext"]');
+        const args = contextArguments(trigger);
+        if (args.length < 11 || args[3] !== '1') return;
+        const name = args[0];
+        const id = args[10];
+        const bar = element('span', 'tp-chip-actions');
+        bar.append(
+          iconButton('refresh', 'Restart ' + name, function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            window.eventControl({ action: 'restart', container: id }, 'loadlist');
+          }, 'tp-chip-action'),
+          iconButton('align-left', 'Logs of ' + name, function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof window.openTerminal === 'function') window.openTerminal('docker', name, '.log');
+          }, 'tp-chip-action'));
+        chip.append(bar);
+      });
+    }
+    new MutationObserver(debounce(decorate)).observe(view, { childList: true, subtree: true });
+    decorate();
+  }
+
+  // Main page: how many days until each disk or pool is full at its rate of the last weeks
+  // (include/diskforecast.php), beside the disk's name. Shown only for disks that are filling.
+  function diskForecast() {
+    const tables = [...document.querySelectorAll('table.disk_status')];
+    if (!tables.length) return;
+    let disks = null;
+    const size = function (kib) {
+      const units = ['KiB', 'MiB', 'GiB', 'TiB'];
+      let value = Math.abs(kib);
+      let unit = 0;
+      while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
+      return (value >= 10 ? Math.round(value) : value.toFixed(1)) + ' ' + units[unit];
+    };
+    function run() {
+      if (!disks) return;
+      tables.forEach(function (table) {
+        table.querySelectorAll('tbody tr').forEach(function (row) {
+          const first = row.querySelector('td');
+          if (!first || first.querySelector('.tp-forecast')) return;
+          const link = first.querySelector('a');
+          const name = ((link || first).textContent.split('(')[0] || '').toLowerCase().replace(/\s+/g, '');
+          const disk = disks[name];
+          if (!disk || disk.days == null || disk.days > 3650) return;
+          const chip = element('span', 'tp-forecast' + (disk.days < 30 ? ' tp-forecast-soon' : ''), disk.days < 1 ? 'full today' : 'full in ~' + (disk.days >= 365 ? Math.round(disk.days / 36.5) / 10 + ' y' : disk.days + ' d'));
+          chip.title = 'At the recent rate of ' + size(disk.perDay) + ' a day';
+          first.append(chip);
+        });
+      });
+    }
+    tables.forEach(function (table) { new MutationObserver(debounce(run)).observe(table, { childList: true, subtree: true }); });
+    getJson('/include/diskforecast.php').then(function (data) { disks = data.disks || {}; run(); }, function (error) { console.error('Aurora Theme disk forecast:', error); });
+  }
+
+  // Top bar: a bell with the number of unread notifications; it opens a panel with each one,
+  // its own "mark read", and "Mark all read". Uses Unraid's own Notify.php (get, archive).
+  function notificationPanel() {
+    const crumb = document.querySelector('#header .tp-crumb');
+    if (!crumb || crumb.querySelector('.tp-bell')) return;
+    const bell = iconButton('bell', 'Notifications', toggle, 'tp-bell');
+    const badge = element('span', 'tp-bell-count');
+    badge.hidden = true;
+    bell.append(badge);
+    crumb.append(bell);
+    let panel = null;
+    let items = [];
+    function post(data) {
+      const body = new URLSearchParams(Object.assign({ csrf_token: window.csrf_token || '' }, data));
+      return fetch('/webGui/include/Notify.php', { method: 'POST', credentials: 'same-origin', body: body }).then(function (response) {
+        if (!response.ok) throw new Error('Notify.php failed with status ' + response.status);
+        return response.text();
+      });
+    }
+    function load() {
+      return post({ cmd: 'get' }).then(function (text) {
+        let list = [];
+        try { list = JSON.parse(text || '[]'); } catch (error) { list = []; }
+        items = Array.isArray(list) ? list : [];
+        badge.hidden = !items.length;
+        badge.textContent = items.length > 99 ? '99+' : String(items.length);
+        bell.title = items.length ? items.length + ' unread notifications' : 'No unread notifications';
+        if (panel) render();
+      }).catch(function (error) { console.error('Aurora Theme notifications:', error); });
+    }
+    function when(stamp) {
+      const date = new Date((Number(stamp) || 0) * 1000);
+      return isNaN(date) ? '' : date.toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    }
+    function render() {
+      const list = panel.querySelector('.tp-notes-list');
+      list.replaceChildren(...items.map(function (note) {
+        const tone = note.importance === 'alert' ? 'danger' : note.importance === 'warning' ? 'warn' : 'info';
+        const row = element('li', 'tp-note tp-problem-' + tone);
+        const body = element(note.link && String(note.link).startsWith('/') ? 'a' : 'div', 'tp-problem-link');
+        if (body.tagName === 'A') body.href = note.link;
+        body.append(element('strong', '', String(note.subject || note.event || 'Notification')), element('span', '', String(note.description || '')), element('small', 'tp-note-time', when(note.timestamp)));
+        const done = iconButton('check', 'Mark read', function () {
+          post({ cmd: 'archive', file: String(note.file || '').split('/').pop() }).then(load);
+        }, 'tp-note-done');
+        row.append(body, done);
+        return row;
+      }));
+      if (!items.length) list.append(element('li', 'tp-problems-empty', 'No unread notifications.'));
+      panel.querySelector('.tp-notes-all').disabled = !items.length;
+    }
+    function outside(event) { if (panel && !panel.contains(event.target) && !bell.contains(event.target)) close(); }
+    function onKey(event) { if (event.key === 'Escape') { close(); bell.focus(); } }
+    function close() {
+      if (!panel) return;
+      panel.remove();
+      panel = null;
+      document.removeEventListener('mousedown', outside, true);
+      document.removeEventListener('keydown', onKey, true);
+    }
+    function toggle(event) {
+      event.preventDefault();
+      if (panel) return close();
+      panel = element('div', 'tp-problems tp-notes');
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-label', 'Notifications');
+      const head = element('div', 'tp-notes-head');
+      const all = element('button', 'tp-notes-all', 'Mark all read');
+      all.type = 'button';
+      all.addEventListener('click', function () {
+        all.disabled = true;
+        Promise.all(items.map(function (note) { return post({ cmd: 'archive', file: String(note.file || '').split('/').pop() }); })).then(load, load);
+      });
+      const more = element('a', 'tp-notes-more', 'All notifications');
+      more.href = '/Tools/Notifications';
+      head.append(element('strong', '', 'Notifications'), all, more);
+      panel.append(head, element('ul', 'tp-problems-list tp-notes-list'));
+      const rect = bell.getBoundingClientRect();
+      panel.style.top = (rect.bottom + 6) + 'px';
+      panel.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 400)) + 'px';
+      document.body.append(panel);
+      document.addEventListener('mousedown', outside, true);
+      document.addEventListener('keydown', onKey, true);
+      render();
+      load();
+    }
+    load();
+    setInterval(function () { if (!document.hidden) load(); }, 60000);
+  }
+
+  // Dashboard, network graph: Unraid draws it in red and orange; it takes the theme's colours
+  // (download in the accent, upload in teal) with a soft fill.
+  function dashboardNetwork() {
+    const chart = window.netchart;
+    if (!chart || !Array.isArray(chart.seriesSet) || chart.seriesSet.length < 2) return;
+    const styles = getComputedStyle(document.documentElement);
+    const primary = styles.getPropertyValue('--tp-primary').trim() || '#4f8bff';
+    const colours = [primary, '#2dd4bf'];
+    chart.seriesSet.slice(0, 2).forEach(function (series, index) {
+      series.options.strokeStyle = colours[index];
+      series.options.lineWidth = 1.5;
+      series.options.fillStyle = 'color-mix(in srgb, ' + colours[index] + ' 12%, transparent)';
+    });
+  }
+
+  // Dashboard, System tile: the last starts of the server and how long each run lasted
+  // (include/boots.php), under the memory rings.
+  function bootHistory() {
+    const charts = document.querySelector('.tile-system-memory-charts');
+    const tile = charts && charts.closest('tbody');
+    if (!tile || tile.querySelector('.tp-boots')) return;
+    const span = function (seconds) {
+      const days = Math.floor(seconds / 86400);
+      const hours = Math.floor((seconds % 86400) / 3600);
+      return days ? days + ' d ' + hours + ' h' : hours ? hours + ' h ' + Math.floor((seconds % 3600) / 60) + ' min' : Math.max(1, Math.floor(seconds / 60)) + ' min';
+    };
+    getJson('/include/boots.php').then(function (data) {
+      const boots = data.boots || [];
+      if (!boots.length || tile.querySelector('.tp-boots')) return;
+      const row = element('tr', 'tp-boots');
+      const cell = element('td');
+      cell.colSpan = 4;
+      const list = element('ul', 'tp-boots-list');
+      boots.forEach(function (entry, index) {
+        const started = new Date(entry.boot * 1000).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        const ran = index === 0 ? 'running for ' + span(data.now - entry.boot) : 'ran ~' + span(Math.max(0, entry.seen - entry.boot));
+        const item = element('li', index === 0 ? 'tp-boot-current' : '');
+        item.append(element('span', 'tp-boot-when', started), element('span', 'tp-boot-ran', ran));
+        list.append(item);
+      });
+      cell.append(element('span', 'tp-boots-title', 'Recent starts'), list);
+      row.append(cell);
+      tile.append(row);
+    }, function (error) { console.error('Aurora Theme boot history:', error); });
+  }
+
   function start() {
     const info = pageInfo();
-    [function () { topBar(info); }, alertPill, problemList, opsPill, quickJump, themeSwitch, autoTheme, function () { serverCard(info); }, function () { pageHeading(info); }, function () { folderViewBeta(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, sharesPage, selectLists, lockState, docker, dockerPorts, containerGraphs, logFilter, vmViewSwitch, vmGroups, vmDetails, mainTables, diskTemps, arrayOperations, dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardUpdates, dockerUpdateWatch, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, diskLocationBays, sectionRows, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
+    [function () { topBar(info); }, alertPill, problemList, notificationPanel, opsPill, quickJump, themeSwitch, autoTheme, function () { serverCard(info); }, function () { pageHeading(info); }, function () { folderViewBeta(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, sharesPage, selectLists, lockState, docker, dockerPorts, containerGraphs, logFilter, vmViewSwitch, vmGroups, vmDetails, mainTables, diskTemps, diskForecast, arrayOperations, dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardAppActions, dashboardNetwork, bootHistory, dashboardUpdates, dockerUpdateWatch, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, diskLocationBays, sectionRows, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
       // One failing enhancer must not stop the others or the page's own scripts.
       try { enhancer(); } catch (error) { console.error('Aurora Theme:', error); }
     });

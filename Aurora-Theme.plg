@@ -3,7 +3,7 @@
 
 <PLUGIN name="Aurora-Theme"
         author="Tunefish"
-        version="2026.10.31.2023"
+        version="2026.10.31.2029"
         launch="Settings/AuroraThemeSettings"
         pluginURL="https://raw.githubusercontent.com/ldoctoru/Aurora-Theme/release/Aurora-Theme.plg"
         support="https://github.com/ldoctoru/Aurora-Theme/issues"
@@ -11,7 +11,7 @@
         min="7.2.0">
 
 <CHANGES>
-###2026.10.31.2023
+###2026.10.31.2029
 - New colours, fonts, tables, buttons, dialogs and notification panel for the Black and White themes.
 - Optional sidebar navigation layout.
 - Page enhancements: brand and server card in the sidebar, slim top bar, page headings, status pills, Docker summary and filters.
@@ -74,10 +74,10 @@ if [ -e /boot/config/plugins/$OLD.plg ] || [ -d /usr/local/emhttp/plugins/$OLD ]
   echo "Settings moved over from $OLD, which has been removed."
 fi
 old=$(sed -n 's/^[[:space:]]*version="\([^"]*\)".*/\1/p' /boot/config/plugins/Aurora-Theme.plg 2>/dev/null | head -n 1)
-if [[ "$old" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}[A-Za-z0-9._-]*$ && "$old" != "2026.10.31.2023" ]]; then
+if [[ "$old" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}[A-Za-z0-9._-]*$ && "$old" != "2026.10.31.2029" ]]; then
   from=$(sed -n 's/.*"from":"\([^"]*\)".*/\1/p' /boot/config/plugins/Aurora-Theme/updated.json 2>/dev/null)
   [[ "$from" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}[A-Za-z0-9._-]*$ ]] || from=$old
-  printf '{"from":"%s","to":"%s","time":%s}\n' "$from" "2026.10.31.2023" "$(date +%s)" > /boot/config/plugins/Aurora-Theme/updated.json
+  printf '{"from":"%s","to":"%s","time":%s}\n' "$from" "2026.10.31.2029" "$(date +%s)" > /boot/config/plugins/Aurora-Theme/updated.json
 fi
 cat > /usr/local/emhttp/plugins/Aurora-Theme/AuroraTheme.page <<'AURORA_THEME_EOF'
 Menu="Buttons"
@@ -372,7 +372,7 @@ if (in_array(rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PAT
 <?php if ($auroraClasses): ?>
 <script>document.documentElement.classList.add(...<?= json_encode($auroraClasses) ?>);</script>
 <?php endif; ?>
-<?php if (substr('2026.10.31.2023', -4) === '-dev'): ?>
+<?php if (substr('2026.10.31.2029', -4) === '-dev'): ?>
 <?php // A dev build (version "...-dev", set by plugin/build.py) is installed: a "Dev" badge in the
       // top bar, linking to the settings, where the update channel goes back to stable. ?>
 <style id="aurora-dev-badge">
@@ -394,7 +394,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var badge = document.createElement('a');
   badge.className = 'tp-dev-badge';
   badge.href = '/Settings/AuroraThemeSettings';
-  badge.title = 'Aurora Theme dev build 2026.10.31.2023: a test version, installed because the update channel is set to dev builds. Click to change it.';
+  badge.title = 'Aurora Theme dev build 2026.10.31.2029: a test version, installed because the update channel is set to dev builds. Click to change it.';
   badge.innerHTML = '<i aria-hidden="true"></i><span>Aurora</span><b>Dev</b>';
   // Where it goes: with the sidebar shown, on its own line under Unraid's version (the version
   // row has room for the version and its update notice only); otherwise in
@@ -462,6 +462,8 @@ $aurora = parse_plugin_cfg('Aurora-Theme');
 <form markdown="1" method="POST" action="/update.php" target="progressFrame">
 <input type="hidden" name="#file" value="Aurora-Theme/Aurora-Theme.cfg">
 
+<div class="title"><span class="left"><i class="fa fa-paint-brush title"></i>_(Look)_</span></div>
+
 _(Colours and fonts)_:
 : <select name="theme">
   <?=mk_option($aurora['theme'], "yes", _("Enabled"))?>
@@ -527,6 +529,30 @@ _(Navigation layout)_:
 > Moves the main menu into a sidebar on screens at least 1024 pixels wide. Needs a top-navigation
 > Dynamix theme (Black or White).
 
+_(Table density)_:
+: <select name="density">
+  <?=mk_option($aurora['density'] ?? 'comfortable', "comfortable", _("Comfortable"))?>
+  <?=mk_option($aurora['density'] ?? 'comfortable', "compact", _("Compact"))?>
+  </select>
+
+> Compact uses less space between table rows, so more disks, apps and shares fit on screen.
+
+_(Automatic dark and light)_:
+: <select name="autotheme">
+  <?=mk_option($aurora['autotheme'] ?? 'off', "off", _("Off: only the sun / moon switch"))?>
+  <?=mk_option($aurora['autotheme'] ?? 'off', "system", _("Follow this computer's setting"))?>
+  <?=mk_option($aurora['autotheme'] ?? 'off', "schedule", _("On a timetable"))?>
+  </select>
+
+_(Light from / dark from)_:
+: <input type="time" name="autotheme_light" value="<?=htmlspecialchars($aurora['autotheme_light'] ?? '07:00')?>"> <input type="time" name="autotheme_dark" value="<?=htmlspecialchars($aurora['autotheme_dark'] ?? '19:00')?>">
+
+> The theme is a server setting, so it changes for every browser. It is only switched when your
+> computer's setting changes or a time on the timetable passes, so the sun / moon switch still
+> works in between. Needs the Black or White Dynamix theme.
+
+<div class="title"><span class="left"><i class="fa fa-window-maximize title"></i>_(Top bar and pages)_</span></div>
+
 _(Page enhancements)_:
 : <select name="enhance">
   <?=mk_option($aurora['enhance'], "yes", _("Enabled"))?>
@@ -561,27 +587,7 @@ _(Long operations in the top bar)_:
 > While a parity check, rebuild or the mover runs, a pill in the top bar shows how far it is and
 > the time left, on every page.
 
-_(Table density)_:
-: <select name="density">
-  <?=mk_option($aurora['density'] ?? 'comfortable', "comfortable", _("Comfortable"))?>
-  <?=mk_option($aurora['density'] ?? 'comfortable', "compact", _("Compact"))?>
-  </select>
-
-> Compact uses less space between table rows, so more disks, apps and shares fit on screen.
-
-_(Automatic dark and light)_:
-: <select name="autotheme">
-  <?=mk_option($aurora['autotheme'] ?? 'off', "off", _("Off: only the sun / moon switch"))?>
-  <?=mk_option($aurora['autotheme'] ?? 'off', "system", _("Follow this computer's setting"))?>
-  <?=mk_option($aurora['autotheme'] ?? 'off', "schedule", _("On a timetable"))?>
-  </select>
-
-_(Light from / dark from)_:
-: <input type="time" name="autotheme_light" value="<?=htmlspecialchars($aurora['autotheme_light'] ?? '07:00')?>"> <input type="time" name="autotheme_dark" value="<?=htmlspecialchars($aurora['autotheme_dark'] ?? '19:00')?>">
-
-> The theme is a server setting, so it changes for every browser. It is only switched when your
-> computer's setting changes or a time on the timetable passes, so the sun / moon switch still
-> works in between. Needs the Black or White Dynamix theme.
+<div class="title"><span class="left"><i class="fa fa-th-large title"></i>_(Dashboard)_</span></div>
 
 _(Dashboard app tiles)_:
 : <select name="apptiles">
@@ -613,6 +619,8 @@ _(Stats page)_:
 > Adds a Stats tab with processor, memory, network and disk charts, and records one measurement
 > per minute for it. It replaces the Dynamix System Statistics plugin; remove that plugin first,
 > because both use the name "Stats" for their tab.
+
+<div class="title"><span class="left"><i class="fa fa-refresh title"></i>_(Updates)_</span></div>
 
 _(Update channel)_:
 : <select name="channel">
@@ -7258,6 +7266,16 @@ usort($apps, function ($a, $b) {
 });
 echo json_encode(['apps' => $apps], JSON_UNESCAPED_SLASHES);
 AURORA_THEME_EOF
+cat > /usr/local/emhttp/plugins/Aurora-Theme/include/boots.php <<'AURORA_THEME_EOF'
+<?php
+// Recent starts of the server, newest first, kept by scripts/collect.php:
+// {"boots": [{"boot": 1761900000, "seen": 1761990000}, ...], "now": 1761999999}
+header('Content-Type: application/json');
+header('Cache-Control: no-store');
+$boots = json_decode((string) @file_get_contents('/boot/config/plugins/Aurora-Theme/boots.json'), true);
+$boots = is_array($boots) ? array_values($boots) : [];
+echo json_encode(['boots' => array_reverse(array_slice($boots, -6)), 'now' => time()]);
+AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/include/check-update.php <<'AURORA_THEME_EOF'
 <?php
 // "Check for updates" on the settings page: compares the newest GitHub release with the
@@ -7400,6 +7418,42 @@ echo json_encode([
     'energy' => $energy,
     'temps' => array_values($temps),
 ]);
+AURORA_THEME_EOF
+cat > /usr/local/emhttp/plugins/Aurora-Theme/include/diskforecast.php <<'AURORA_THEME_EOF'
+<?php
+// When each disk or pool will be full at its recent rate, from the daily usage that
+// scripts/collect.php keeps: {"disks": {"disk1": {"days": 120, "perDay": 1048576}, ...}}
+// (perDay in KiB; days is null while the disk is not filling or there are under 3 days).
+header('Content-Type: application/json');
+header('Cache-Control: no-store');
+
+$history = json_decode((string) @file_get_contents('/boot/config/plugins/Aurora-Theme/diskusage.json'), true);
+$history = is_array($history) ? $history : [];
+$disks = (array) @parse_ini_file('/var/local/emhttp/disks.ini', true);
+$out = [];
+foreach ($disks as $key => $disk) {
+    if (!is_array($disk)) continue;
+    $name = strtolower((string) ($disk['name'] ?? $key));
+    $free = (float) ($disk['fsFree'] ?? 0);
+    $days = $history[$name] ?? [];
+    if (count($days) < 3 || $free <= 0) continue;
+    ksort($days);
+    // Least-squares slope of used space per day, over the kept days.
+    $n = 0; $sx = $sy = $sxx = $sxy = 0.0;
+    $first = null;
+    foreach ($days as $day => $used) {
+        $t = strtotime((string) $day);
+        if ($t === false) continue;
+        $first = $first ?? $t;
+        $x = ($t - $first) / 86400;
+        $n++; $sx += $x; $sy += $used; $sxx += $x * $x; $sxy += $x * $used;
+    }
+    $den = $n * $sxx - $sx * $sx;
+    if ($n < 3 || $den == 0) continue;
+    $slope = ($n * $sxy - $sx * $sy) / $den;
+    $out[$name] = ['perDay' => (int) round($slope), 'days' => $slope > 0 ? (int) floor($free / $slope) : null];
+}
+echo json_encode(['disks' => (object) $out]);
 AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/include/disktemps.php <<'AURORA_THEME_EOF'
 <?php
@@ -7891,6 +7945,58 @@ if ($pid > 0 && file_exists("/proc/$pid")) {
 }
 echo json_encode(['ops' => $ops]);
 AURORA_THEME_EOF
+cat > /usr/local/emhttp/plugins/Aurora-Theme/include/pinning.php <<'AURORA_THEME_EOF'
+<?php
+// Which VMs and containers are pinned to which CPU threads, for the Dashboard's core tiles:
+// {"pins": {"0": ["VM win10"], "10": ["App plex"]}, "isolated": [2, 3]}. Read-only.
+header('Content-Type: application/json');
+header('Cache-Control: no-store');
+
+$pins = [];
+$cpus = function (string $set): array {
+    $out = [];
+    foreach (explode(',', $set) as $part) {
+        $part = trim($part);
+        if (preg_match('/^(\d+)-(\d+)$/', $part, $m)) $out = array_merge($out, range((int) $m[1], min((int) $m[2], (int) $m[1] + 512)));
+        elseif (ctype_digit($part)) $out[] = (int) $part;
+    }
+    return array_unique($out);
+};
+$add = function (string $owner, array $list) use (&$pins) {
+    foreach ($list as $cpu) {
+        if (!in_array($owner, $pins[$cpu] ?? [], true)) $pins[$cpu][] = $owner;
+    }
+};
+
+// VMs: libvirt's definitions (vcpupin, or the vcpu element's cpuset).
+foreach (glob('/etc/libvirt/qemu/*.xml') ?: [] as $file) {
+    $xml = @simplexml_load_file($file);
+    if (!$xml) continue;
+    $name = 'VM ' . (string) $xml->name;
+    $list = [];
+    foreach ($xml->xpath('//cputune/vcpupin') ?: [] as $pin) $list = array_merge($list, $cpus((string) $pin['cpuset']));
+    if (!$list && isset($xml->vcpu['cpuset'])) $list = $cpus((string) $xml->vcpu['cpuset']);
+    $add($name, array_unique($list));
+}
+
+// Containers: --cpuset-cpus of the running ones.
+if (is_executable('/usr/bin/docker')) {
+    exec("timeout 5 /usr/bin/docker ps -q 2>/dev/null", $ids, $code);
+    if ($code === 0 && $ids) {
+        exec('timeout 5 /usr/bin/docker inspect -f ' . escapeshellarg('{{.Name}}|{{.HostConfig.CpusetCpus}}') . ' ' . implode(' ', array_map('escapeshellarg', $ids)) . ' 2>/dev/null', $lines);
+        foreach ($lines as $line) {
+            [$name, $set] = array_pad(explode('|', $line, 2), 2, '');
+            if (trim($set) !== '') $add('App ' . ltrim($name, '/'), $cpus($set));
+        }
+    }
+}
+
+// Isolated threads (Settings > CPU Pinning, "CPU Isolation"): isolcpus on the kernel line.
+$isolated = [];
+if (preg_match('/\bisolcpus=([\d,\-]+)/', (string) @file_get_contents('/proc/cmdline'), $m)) $isolated = array_values($cpus($m[1]));
+
+echo json_encode(['pins' => (object) $pins, 'isolated' => $isolated]);
+AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/include/plugin-recheck.php <<'AURORA_THEME_EOF'
 <?php
 // Plugins page: Unraid checks every plugin for updates once per visit, with one download of
@@ -8316,6 +8422,43 @@ require __DIR__ . '/../include/StatsLib.php';
         if (!$peaks[$name]) unset($peaks[$name]);
     }
     @file_put_contents($file, json_encode($peaks), LOCK_EX);
+})();
+
+// Daily used space per disk and the server's starts, on the flash drive so they survive a
+// reboot; each is written at most once a day (usage) or once an hour (starts).
+(function () {
+    $dir = '/boot/config/plugins/Aurora-Theme';
+    if (!is_dir($dir)) return;
+
+    $file = "$dir/diskusage.json";
+    $today = date('Y-m-d');
+    $usage = json_decode((string) @file_get_contents($file), true);
+    $usage = is_array($usage) ? $usage : [];
+    $changed = false;
+    foreach ((array) @parse_ini_file('/var/local/emhttp/disks.ini', true) as $key => $disk) {
+        if (!is_array($disk) || !is_numeric($disk['fsSize'] ?? '') || (float) $disk['fsSize'] <= 0 || !is_numeric($disk['fsFree'] ?? '')) continue;
+        $name = strtolower((string) ($disk['name'] ?? $key));
+        if (isset($usage[$name][$today])) continue;
+        $usage[$name][$today] = (float) $disk['fsSize'] - (float) $disk['fsFree'];
+        $usage[$name] = array_slice($usage[$name], -30, null, true);
+        $changed = true;
+    }
+    if ($changed) @file_put_contents($file, json_encode($usage), LOCK_EX);
+
+    $file = "$dir/boots.json";
+    if (!preg_match('/^btime\s+(\d+)/m', (string) @file_get_contents('/proc/stat'), $m)) return;
+    $boot = (int) $m[1];
+    $boots = json_decode((string) @file_get_contents($file), true);
+    $boots = is_array($boots) ? $boots : [];
+    $last = end($boots);
+    // btime can move by a second between reads; within a minute it is the same start.
+    if (!$last || abs((int) $last['boot'] - $boot) > 60) {
+        $boots[] = ['boot' => $boot, 'seen' => time()];
+        @file_put_contents($file, json_encode(array_slice($boots, -10)), LOCK_EX);
+    } elseif (time() - (int) $last['seen'] >= 3600) {
+        $boots[count($boots) - 1]['seen'] = time();
+        @file_put_contents($file, json_encode($boots), LOCK_EX);
+    }
 })();
 
 if (!tft_stats_enabled()) {
@@ -10715,6 +10858,7 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
 
     // Captured before Unraid's own handler, which would open the small context menu instead.
     view.addEventListener('click', function (event) {
+      if (event.target.closest('.tp-chip-actions')) return;
       const chip = event.target.closest('span.outer.apps');
       if (!chip || event.button !== 0 || menuClick) return;
       const id = plus ? '' : folderId(chip);
@@ -10807,6 +10951,7 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
       const match = full.match(/^CPU\s+(\d+)\s*(\([^)]*\))?\s*(?:-\s*HT\s+(\d+))?/);
       if (!match) return;
       row.title = full;
+      row.dataset.cpus = [match[1], match[3]].filter(Boolean).join(',');
       label.textContent = match[1] + (match[3] ? ' · ' + match[3] : '');
       if (match[2]) {
         const type = match[2].replace(/[()]/g, '').trim();
@@ -10851,6 +10996,28 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
       });
       update();
     });
+
+    // Who is pinned to each core (include/pinning.php): a line under the core with the VMs and
+    // apps, and a mark on isolated threads, so a core that is always busy explains itself.
+    getJson('/include/pinning.php').then(function (data) {
+      const pins = data.pins || {};
+      const isolated = (data.isolated || []).map(String);
+      tile.querySelectorAll('tr.tp-core[data-cpus]').forEach(function (row) {
+        const cpus = row.dataset.cpus.split(',');
+        const owners = [];
+        cpus.forEach(function (cpu) { (pins[cpu] || []).forEach(function (owner) { if (!owners.includes(owner)) owners.push(owner); }); });
+        const cell = row.querySelector(':scope > td');
+        if (!cell || cell.querySelector('.tp-core-pin')) return;
+        const iso = cpus.filter(function (cpu) { return isolated.includes(cpu); });
+        if (!owners.length && !iso.length) return;
+        const note = element('span', 'tp-core-pin');
+        const text = (owners.length ? owners.join(', ') : '') + (iso.length ? (owners.length ? ' · ' : '') + 'isolated' : '');
+        note.append(element('i', 'fa fa-thumb-tack'), document.createTextNode(' ' + text));
+        note.title = 'Pinned to CPU ' + cpus.join(' and ') + ': ' + (owners.join(', ') || 'nothing') + (iso.length ? '. Isolated from Unraid: ' + iso.join(', ') : '');
+        cell.append(note);
+        row.classList.add('tp-core-pinned');
+      });
+    }, function (error) { console.error('Aurora Theme CPU pinning:', error); });
   }
 
   // Dashboard, System tile: Unraid draws its four rings in grey from a colour list in the page
@@ -13244,9 +13411,211 @@ cat > /usr/local/emhttp/plugins/Aurora-Theme/scripts/enhance.js <<'AURORA_THEME_
     setTimeout(check, 1500);
   }
 
+
+  // Dashboard, Docker tile: hovering a running app shows Restart and Logs buttons on its chip,
+  // so the common actions need no menu. Unraid redraws the chips; the buttons are put back.
+  function dashboardAppActions() {
+    const view = document.getElementById('docker_view');
+    if (!view || typeof window.eventControl !== 'function') return;
+    function decorate() {
+      view.querySelectorAll('span.outer.apps:not([class*="folder-"])').forEach(function (chip) {
+        if (chip.querySelector(':scope > .tp-chip-actions')) return;
+        const trigger = chip.querySelector(':scope > span.hand[onclick*="addDockerContainerContext"]');
+        const args = contextArguments(trigger);
+        if (args.length < 11 || args[3] !== '1') return;
+        const name = args[0];
+        const id = args[10];
+        const bar = element('span', 'tp-chip-actions');
+        bar.append(
+          iconButton('refresh', 'Restart ' + name, function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            window.eventControl({ action: 'restart', container: id }, 'loadlist');
+          }, 'tp-chip-action'),
+          iconButton('align-left', 'Logs of ' + name, function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof window.openTerminal === 'function') window.openTerminal('docker', name, '.log');
+          }, 'tp-chip-action'));
+        chip.append(bar);
+      });
+    }
+    new MutationObserver(debounce(decorate)).observe(view, { childList: true, subtree: true });
+    decorate();
+  }
+
+  // Main page: how many days until each disk or pool is full at its rate of the last weeks
+  // (include/diskforecast.php), beside the disk's name. Shown only for disks that are filling.
+  function diskForecast() {
+    const tables = [...document.querySelectorAll('table.disk_status')];
+    if (!tables.length) return;
+    let disks = null;
+    const size = function (kib) {
+      const units = ['KiB', 'MiB', 'GiB', 'TiB'];
+      let value = Math.abs(kib);
+      let unit = 0;
+      while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
+      return (value >= 10 ? Math.round(value) : value.toFixed(1)) + ' ' + units[unit];
+    };
+    function run() {
+      if (!disks) return;
+      tables.forEach(function (table) {
+        table.querySelectorAll('tbody tr').forEach(function (row) {
+          const first = row.querySelector('td');
+          if (!first || first.querySelector('.tp-forecast')) return;
+          const link = first.querySelector('a');
+          const name = ((link || first).textContent.split('(')[0] || '').toLowerCase().replace(/\s+/g, '');
+          const disk = disks[name];
+          if (!disk || disk.days == null || disk.days > 3650) return;
+          const chip = element('span', 'tp-forecast' + (disk.days < 30 ? ' tp-forecast-soon' : ''), disk.days < 1 ? 'full today' : 'full in ~' + (disk.days >= 365 ? Math.round(disk.days / 36.5) / 10 + ' y' : disk.days + ' d'));
+          chip.title = 'At the recent rate of ' + size(disk.perDay) + ' a day';
+          first.append(chip);
+        });
+      });
+    }
+    tables.forEach(function (table) { new MutationObserver(debounce(run)).observe(table, { childList: true, subtree: true }); });
+    getJson('/include/diskforecast.php').then(function (data) { disks = data.disks || {}; run(); }, function (error) { console.error('Aurora Theme disk forecast:', error); });
+  }
+
+  // Top bar: a bell with the number of unread notifications; it opens a panel with each one,
+  // its own "mark read", and "Mark all read". Uses Unraid's own Notify.php (get, archive).
+  function notificationPanel() {
+    const crumb = document.querySelector('#header .tp-crumb');
+    if (!crumb || crumb.querySelector('.tp-bell')) return;
+    const bell = iconButton('bell', 'Notifications', toggle, 'tp-bell');
+    const badge = element('span', 'tp-bell-count');
+    badge.hidden = true;
+    bell.append(badge);
+    crumb.append(bell);
+    let panel = null;
+    let items = [];
+    function post(data) {
+      const body = new URLSearchParams(Object.assign({ csrf_token: window.csrf_token || '' }, data));
+      return fetch('/webGui/include/Notify.php', { method: 'POST', credentials: 'same-origin', body: body }).then(function (response) {
+        if (!response.ok) throw new Error('Notify.php failed with status ' + response.status);
+        return response.text();
+      });
+    }
+    function load() {
+      return post({ cmd: 'get' }).then(function (text) {
+        let list = [];
+        try { list = JSON.parse(text || '[]'); } catch (error) { list = []; }
+        items = Array.isArray(list) ? list : [];
+        badge.hidden = !items.length;
+        badge.textContent = items.length > 99 ? '99+' : String(items.length);
+        bell.title = items.length ? items.length + ' unread notifications' : 'No unread notifications';
+        if (panel) render();
+      }).catch(function (error) { console.error('Aurora Theme notifications:', error); });
+    }
+    function when(stamp) {
+      const date = new Date((Number(stamp) || 0) * 1000);
+      return isNaN(date) ? '' : date.toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    }
+    function render() {
+      const list = panel.querySelector('.tp-notes-list');
+      list.replaceChildren(...items.map(function (note) {
+        const tone = note.importance === 'alert' ? 'danger' : note.importance === 'warning' ? 'warn' : 'info';
+        const row = element('li', 'tp-note tp-problem-' + tone);
+        const body = element(note.link && String(note.link).startsWith('/') ? 'a' : 'div', 'tp-problem-link');
+        if (body.tagName === 'A') body.href = note.link;
+        body.append(element('strong', '', String(note.subject || note.event || 'Notification')), element('span', '', String(note.description || '')), element('small', 'tp-note-time', when(note.timestamp)));
+        const done = iconButton('check', 'Mark read', function () {
+          post({ cmd: 'archive', file: String(note.file || '').split('/').pop() }).then(load);
+        }, 'tp-note-done');
+        row.append(body, done);
+        return row;
+      }));
+      if (!items.length) list.append(element('li', 'tp-problems-empty', 'No unread notifications.'));
+      panel.querySelector('.tp-notes-all').disabled = !items.length;
+    }
+    function outside(event) { if (panel && !panel.contains(event.target) && !bell.contains(event.target)) close(); }
+    function onKey(event) { if (event.key === 'Escape') { close(); bell.focus(); } }
+    function close() {
+      if (!panel) return;
+      panel.remove();
+      panel = null;
+      document.removeEventListener('mousedown', outside, true);
+      document.removeEventListener('keydown', onKey, true);
+    }
+    function toggle(event) {
+      event.preventDefault();
+      if (panel) return close();
+      panel = element('div', 'tp-problems tp-notes');
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-label', 'Notifications');
+      const head = element('div', 'tp-notes-head');
+      const all = element('button', 'tp-notes-all', 'Mark all read');
+      all.type = 'button';
+      all.addEventListener('click', function () {
+        all.disabled = true;
+        Promise.all(items.map(function (note) { return post({ cmd: 'archive', file: String(note.file || '').split('/').pop() }); })).then(load, load);
+      });
+      const more = element('a', 'tp-notes-more', 'All notifications');
+      more.href = '/Tools/Notifications';
+      head.append(element('strong', '', 'Notifications'), all, more);
+      panel.append(head, element('ul', 'tp-problems-list tp-notes-list'));
+      const rect = bell.getBoundingClientRect();
+      panel.style.top = (rect.bottom + 6) + 'px';
+      panel.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 400)) + 'px';
+      document.body.append(panel);
+      document.addEventListener('mousedown', outside, true);
+      document.addEventListener('keydown', onKey, true);
+      render();
+      load();
+    }
+    load();
+    setInterval(function () { if (!document.hidden) load(); }, 60000);
+  }
+
+  // Dashboard, network graph: Unraid draws it in red and orange; it takes the theme's colours
+  // (download in the accent, upload in teal) with a soft fill.
+  function dashboardNetwork() {
+    const chart = window.netchart;
+    if (!chart || !Array.isArray(chart.seriesSet) || chart.seriesSet.length < 2) return;
+    const styles = getComputedStyle(document.documentElement);
+    const primary = styles.getPropertyValue('--tp-primary').trim() || '#4f8bff';
+    const colours = [primary, '#2dd4bf'];
+    chart.seriesSet.slice(0, 2).forEach(function (series, index) {
+      series.options.strokeStyle = colours[index];
+      series.options.lineWidth = 1.5;
+      series.options.fillStyle = 'color-mix(in srgb, ' + colours[index] + ' 12%, transparent)';
+    });
+  }
+
+  // Dashboard, System tile: the last starts of the server and how long each run lasted
+  // (include/boots.php), under the memory rings.
+  function bootHistory() {
+    const charts = document.querySelector('.tile-system-memory-charts');
+    const tile = charts && charts.closest('tbody');
+    if (!tile || tile.querySelector('.tp-boots')) return;
+    const span = function (seconds) {
+      const days = Math.floor(seconds / 86400);
+      const hours = Math.floor((seconds % 86400) / 3600);
+      return days ? days + ' d ' + hours + ' h' : hours ? hours + ' h ' + Math.floor((seconds % 3600) / 60) + ' min' : Math.max(1, Math.floor(seconds / 60)) + ' min';
+    };
+    getJson('/include/boots.php').then(function (data) {
+      const boots = data.boots || [];
+      if (!boots.length || tile.querySelector('.tp-boots')) return;
+      const row = element('tr', 'tp-boots');
+      const cell = element('td');
+      cell.colSpan = 4;
+      const list = element('ul', 'tp-boots-list');
+      boots.forEach(function (entry, index) {
+        const started = new Date(entry.boot * 1000).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        const ran = index === 0 ? 'running for ' + span(data.now - entry.boot) : 'ran ~' + span(Math.max(0, entry.seen - entry.boot));
+        const item = element('li', index === 0 ? 'tp-boot-current' : '');
+        item.append(element('span', 'tp-boot-when', started), element('span', 'tp-boot-ran', ran));
+        list.append(item);
+      });
+      cell.append(element('span', 'tp-boots-title', 'Recent starts'), list);
+      row.append(cell);
+      tile.append(row);
+    }, function (error) { console.error('Aurora Theme boot history:', error); });
+  }
+
   function start() {
     const info = pageInfo();
-    [function () { topBar(info); }, alertPill, problemList, opsPill, quickJump, themeSwitch, autoTheme, function () { serverCard(info); }, function () { pageHeading(info); }, function () { folderViewBeta(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, sharesPage, selectLists, lockState, docker, dockerPorts, containerGraphs, logFilter, vmViewSwitch, vmGroups, vmDetails, mainTables, diskTemps, arrayOperations, dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardUpdates, dockerUpdateWatch, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, diskLocationBays, sectionRows, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
+    [function () { topBar(info); }, alertPill, problemList, notificationPanel, opsPill, quickJump, themeSwitch, autoTheme, function () { serverCard(info); }, function () { pageHeading(info); }, function () { folderViewBeta(info); }, function () { panelFavourites(info); }, function () { panelSearch(info); }, function () { usersPage(info); }, sharesPage, selectLists, lockState, docker, dockerPorts, containerGraphs, logFilter, vmViewSwitch, vmGroups, vmDetails, mainTables, diskTemps, diskForecast, arrayOperations, dashboardShareLinks, dashboardSummary, dashboardApps, dashboardGrouping, dashboardCharts, dashboardCpu, dashboardCores, dashboardContainers, dashboardAppActions, dashboardNetwork, bootHistory, dashboardUpdates, dockerUpdateWatch, dashboardDockerOrder, dashboardVmGroups, dashboardMemory, dashboardGpu, dashboardVmUsage, dashboardFans, diskLocationBays, sectionRows, externalLinkDialog, caOverlay, helpButton, navTitles, usageBar, navProgress, pluginRecheck, function () { toolText(info); }].forEach(function (enhancer) {
       // One failing enhancer must not stop the others or the page's own scripts.
       try { enhancer(); } catch (error) { console.error('Aurora Theme:', error); }
     });
@@ -18518,6 +18887,123 @@ tbody.tp-cpu-tile > tr.tp-core-pair span.w36[data-level="hot"] .usage-disk > spa
 :root.tp-compact table td, :root.tp-compact table th { padding-top: 0.35rem !important; padding-bottom: 0.35rem !important; }
 :root.tp-compact table tbody tr { height: auto !important; }
 :root.tp-compact .tp-chip, :root.tp-compact .tp-pill { padding-top: 0.05rem; padding-bottom: 0.05rem; }
+
+/* ---- Dashboard app chips: Restart and Logs on hover (dashboardAppActions) ---- */
+#docker_view span.outer.apps { position: relative; }
+.tp-chip-actions {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    z-index: 2;
+    display: flex;
+    gap: 0.3rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+}
+#docker_view span.outer.apps:hover > .tp-chip-actions,
+#docker_view span.outer.apps:focus-within > .tp-chip-actions { opacity: 1; pointer-events: auto; }
+.tp-chip-action {
+    display: grid;
+    place-items: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 1px solid var(--tp-border, var(--border-color)) !important;
+    border-radius: 8px !important;
+    background: var(--tp-elevated, var(--background-color)) !important;
+    color: var(--tp-muted, var(--alt-text-color)) !important;
+    font-size: 1.2rem !important;
+}
+.tp-chip-action:hover, .tp-chip-action:focus-visible { color: var(--tp-primary, #4f8bff) !important; border-color: var(--tp-primary, #4f8bff) !important; }
+@media (hover: none) { .tp-chip-actions { display: none; } }
+
+/* ---- Main page: days until full (diskForecast) ---- */
+.tp-forecast {
+    display: inline-block;
+    margin-left: 0.6rem;
+    padding: 0.05rem 0.6rem;
+    border-radius: 999px;
+    background: var(--tp-subtle, rgba(127, 127, 127, 0.12));
+    color: var(--tp-muted, var(--alt-text-color));
+    font-size: 1.05rem;
+    white-space: nowrap;
+}
+.tp-forecast-soon { color: var(--tp-warn-text, #f59e0b); background: var(--tp-warn-bg, rgba(245, 158, 11, 0.12)); }
+
+/* ---- Dashboard core tiles: pinned VMs and apps (dashboardCores) ---- */
+.tp-core-pin {
+    grid-column: 1 / -1;
+    overflow: hidden;
+    color: var(--tp-muted, var(--alt-text-color));
+    font-size: 1.05rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+tbody.tp-cpu-tile > tr.tp-core-pair > td:has(.tp-core-pin) { grid-template-areas: "label avg" "t1 t1" "t2 t2" "pin pin"; }
+tbody.tp-cpu-tile > tr.tp-core-pair .tp-core-pin { grid-area: pin; }
+
+/* ---- Notifications bell and panel (notificationPanel) ---- */
+.tp-bell { position: relative; margin-left: 0.4rem; }
+.tp-bell-count {
+    position: absolute;
+    top: -0.3rem;
+    right: -0.4rem;
+    min-width: 1.6rem;
+    padding: 0 0.4rem;
+    border-radius: 999px;
+    background: var(--tp-danger, #ef4444);
+    color: #fff;
+    font: 700 1rem/1.6rem var(--tp-font-heading, inherit);
+    text-align: center;
+}
+.tp-bell-count[hidden] { display: none; }
+.tp-notes { width: min(40rem, calc(100vw - 16px)); }
+.tp-notes-head { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.2rem 0.4rem; }
+.tp-notes-head strong { flex: 1; }
+.tp-notes-all, .tp-notes-more {
+    margin: 0 !important;
+    padding: 0.3rem 0.8rem !important;
+    border: 1px solid var(--tp-border, var(--border-color)) !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+    color: var(--tp-text, inherit) !important;
+    font-size: 1.15rem !important;
+    text-transform: none !important;
+    text-decoration: none !important;
+}
+.tp-notes-all:disabled { opacity: 0.5; }
+.tp-note { display: flex; align-items: flex-start; gap: 0.4rem; }
+.tp-note > .tp-problem-link { flex: 1; min-width: 0; }
+.tp-note-time { color: var(--tp-muted, var(--alt-text-color)); font-size: 1.05rem; }
+.tp-note-done { flex: none; margin-top: 0.6rem !important; }
+
+/* ---- Dashboard, System tile: recent starts (bootHistory) ---- */
+tr.tp-boots > td { display: block; padding-top: 1rem !important; }
+.tp-boots-title {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--tp-muted, var(--alt-text-color));
+    font: 600 1.1rem var(--tp-font-heading, inherit);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.tp-boots-list { display: grid; gap: 0.3rem; margin: 0; padding: 0; list-style: none; }
+.tp-boots-list li { display: flex; justify-content: space-between; gap: 1rem; font-size: 1.2rem; }
+.tp-boot-ran { color: var(--tp-muted, var(--alt-text-color)); font-variant-numeric: tabular-nums; }
+.tp-boot-current .tp-boot-ran { color: var(--tp-success-text, #22c55e); }
+
+/* ---- Phones: tighter Dashboard tiles, bigger tap targets ---- */
+@media (max-width: 767px) {
+    #db_box1, #db_box2, #db_box3 { border-spacing: 0 0.8rem; }
+    tbody.tp-cpu-tile > tr.tp-core > td { padding: 0.6rem 0.8rem !important; }
+    .tp-icon-button, .tp-chip-action, .tp-log-mode, .tp-notes-all, .tp-notes-more { min-width: 4.4rem; min-height: 4.4rem; }
+    .tp-jump { margin: 0 0.8rem; }
+    .tp-jump-item, .tp-problem-link { padding-top: 1.1rem; padding-bottom: 1.1rem; }
+    .tp-apps-grid { gap: 0.8rem; }
+    .tp-spark-box .tp-spark-text { display: none; }
+}
 AURORA_THEME_EOF
 cat > /usr/local/emhttp/plugins/Aurora-Theme/styles/layout-sidebar.css <<'AURORA_THEME_EOF'
 /*
@@ -26828,7 +27314,7 @@ cat > /boot/config/plugins/Aurora-Theme/stats.cron <<'AURORA_THEME_EOF'
 AURORA_THEME_EOF
 /usr/bin/php /usr/local/emhttp/plugins/Aurora-Theme/scripts/schedule.php
 echo ""
-echo "Aurora-Theme 2026.10.31.2023 is installed."
+echo "Aurora-Theme 2026.10.31.2029 is installed."
 echo "Settings: Settings > User Utilities > Aurora Theme"
 echo ""
 ]]>
